@@ -386,3 +386,19 @@ export const rateLimit = sqliteTable(
   },
   (table) => [primaryKey({ name: "rate_limit_pk", columns: [table.key, table.window] })],
 );
+
+// Lets a plain member write in one environment. Reading is the key grant itself; owners and admins
+// can always write. A row here without a key grant has no effect.
+export const environmentWrite = sqliteTable(
+  "environment_write",
+  {
+    envId: text("env_id")
+      .notNull()
+      .references(() => environment.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (table) => [primaryKey({ name: "environment_write_pk", columns: [table.envId, table.userId] })],
+);

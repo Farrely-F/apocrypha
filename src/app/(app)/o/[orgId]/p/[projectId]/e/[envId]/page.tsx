@@ -64,7 +64,7 @@ async function EnvironmentView({ params }: { params: Params }) {
           orgId={view.orgId}
           currentUserId={user.id}
           keyVersion={view.currentKeyVersion}
-          canWrite={view.role === "owner" || view.role === "admin"}
+          canWrite={view.canWrite}
         />
       </div>
     </>

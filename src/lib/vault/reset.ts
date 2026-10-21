@@ -102,6 +102,7 @@ export async function resetVault(db: Db, userId: string, payload: VaultPayload):
       .set({ publicKey: payload.publicKey, passphraseBlob: payload.passphraseBlob, recoveryBlob: payload.recoveryBlob, updatedAt: new Date() })
       .where(eq(schema.vault.userId, userId));
     await tx.delete(schema.environmentKeyGrant).where(and(eq(schema.environmentKeyGrant.principalType, "user"), eq(schema.environmentKeyGrant.principalId, userId)));
+    await tx.delete(schema.environmentWrite).where(eq(schema.environmentWrite.userId, userId));
     const requests = [...impact.recoverable, ...impact.waiting];
     if (requests.length) await tx.insert(schema.regrantRequest).values(requests.map((e) => ({ envId: e.envId, userId })));
     // Only environments nobody else can open AND that this user has the authority to delete.

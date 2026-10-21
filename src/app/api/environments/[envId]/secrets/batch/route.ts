@@ -24,8 +24,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ env
   const access = isUuid(envId) ? await getEnvironmentKeys(db, session.user.id, envId) : null;
   if (!access) return json({ error: "Not found." }, 404);
   // Decide who may write before reading a potentially large body.
-  if (access.role !== "owner" && access.role !== "admin") {
-    return json({ error: "Your role can read this environment but not add secrets." }, 403);
+  if (!access.canWrite) {
+    return json({ error: "You can read this environment but not add secrets." }, 403);
   }
 
   const read = await readJsonLimited(request, MAX_BODY_BYTES);

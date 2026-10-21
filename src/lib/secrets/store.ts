@@ -9,6 +9,8 @@ type Db = LibSQLDatabase<typeof schema>;
 
 export type EnvironmentKeys = {
   role: OrgRole;
+  /** Owners and admins always; a plain member only where they were given write access to this environment. */
+  canWrite: boolean;
   currentKeyVersion: number;
   /** The caller's own wrapped copies of the environment key, oldest first. */
   grants: { keyVersion: number; wrappedKey: string }[];
@@ -47,7 +49,12 @@ export async function getEnvironmentKeys(
     )
     .orderBy(asc(schema.environmentKeyGrant.keyVersion));
   if (grants.length === 0) return null;
-  return { ...row, grants };
+  const [flag] = await db
+    .select({ envId: schema.environmentWrite.envId })
+    .from(schema.environmentWrite)
+    .where(and(eq(schema.environmentWrite.envId, envId), eq(schema.environmentWrite.userId, userId)))
+    .limit(1);
+  return { ...row, canWrite: WRITERS.includes(row.role) || !!flag, grants };
 }
 
 /** Latest version of every secret in the environment, or null without access. */
@@ -83,7 +90,7 @@ export type CreateSecretResult =
   | { status: "created"; id: string; version: 1 }
   | { status: "forbidden" | "stale-key" | "exists" };
 
-/** Only these roles may write; everyone else with a grant can read. */
+/** These roles may write in every environment they can open. Others need a per-environment write grant. */
 const WRITERS: readonly OrgRole[] = ["owner", "admin"];
 
 /**
@@ -97,7 +104,7 @@ export async function createSecret(
   body: CreateSecretBody,
 ): Promise<CreateSecretResult> {
   const access = await getEnvironmentKeys(db, userId, envId);
-  if (!access || !WRITERS.includes(access.role)) return { status: "forbidden" };
+  if (!access || !access.canWrite) return { status: "forbidden" };
   if (body.keyVersion !== access.currentKeyVersion || !access.grants.some((g) => g.keyVersion === body.keyVersion)) {
     return { status: "stale-key" };
   }
@@ -137,7 +144,7 @@ export async function createSecrets(
   bodies: CreateSecretBody[],
 ): Promise<CreateSecretsResult> {
   const access = await getEnvironmentKeys(db, userId, envId);
-  if (!access || !WRITERS.includes(access.role)) return { status: "forbidden" };
+  if (!access || !access.canWrite) return { status: "forbidden" };
   for (const b of bodies) {
     if (b.keyVersion !== access.currentKeyVersion || !access.grants.some((g) => g.keyVersion === b.keyVersion)) {
       return { status: "stale-key" };
@@ -240,7 +247,7 @@ export async function addVersion(
   body: NewVersionBody,
 ): Promise<AddVersionResult> {
   const access = await getEnvironmentKeys(db, userId, envId);
-  if (!access || !WRITERS.includes(access.role)) return { status: "forbidden" };
+  if (!access || !access.canWrite) return { status: "forbidden" };
   if (body.keyVersion !== access.currentKeyVersion || !access.grants.some((g) => g.keyVersion === body.keyVersion)) {
     return { status: "stale-key" };
   }

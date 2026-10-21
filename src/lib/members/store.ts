@@ -194,6 +194,9 @@ export async function removeMember(db: Db, actorId: string, orgId: string, targe
           ),
         );
       await tx
+        .delete(schema.environmentWrite)
+        .where(and(eq(schema.environmentWrite.userId, targetId), inArray(schema.environmentWrite.envId, orgEnvs)));
+      await tx
         .delete(schema.regrantRequest)
         .where(and(eq(schema.regrantRequest.userId, targetId), inArray(schema.regrantRequest.envId, orgEnvs)));
       await tx.delete(schema.member).where(and(eq(schema.member.organizationId, orgId), eq(schema.member.userId, targetId)));

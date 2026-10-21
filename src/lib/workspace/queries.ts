@@ -56,6 +56,8 @@ export async function insertPersonalWorkspace(
 export type EnvironmentView = WorkspaceIds & {
   orgName: string;
   role: schema.OrgRole;
+  /** Owners and admins always; a plain member only with a write grant on this environment. */
+  canWrite: boolean;
   projectName: string;
   environmentName: string;
   currentKeyVersion: number;
@@ -102,7 +104,13 @@ export async function getEnvironmentForUser(
       ),
     )
     .limit(1);
-  return row ? { ...ids, ...row } : null;
+  if (!row) return null;
+  const [flag] = await db
+    .select({ envId: schema.environmentWrite.envId })
+    .from(schema.environmentWrite)
+    .where(and(eq(schema.environmentWrite.envId, ids.envId), eq(schema.environmentWrite.userId, userId)))
+    .limit(1);
+  return { ...ids, ...row, canWrite: row.role === "owner" || row.role === "admin" || !!flag };
 }
 
 /**
