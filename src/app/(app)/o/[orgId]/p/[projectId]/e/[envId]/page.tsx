@@ -72,7 +72,7 @@ async function EnvironmentView({ params }: { params: Params }) {
             <Fact label="version">v{view.currentKeyVersion}</Fact>
           </dl>
           <p className="mt-2 text-xs text-bone-faint">
-            Sealed to your public key. The server stores the wrapped key and cannot open it.
+            Sealed to your public key. The server holds only the wrapped key.
           </p>
         </Pane>
 

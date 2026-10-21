@@ -29,7 +29,8 @@ export async function insertPersonalWorkspace(
     id: orgId,
     name: ws.orgName,
     // Better Auth's organization plugin requires a unique slug.
-    slug: `personal-${orgId.slice(0, 8)}`,
+    // Full id: a short prefix could collide and roll the whole vault creation back.
+    slug: `personal-${orgId}`,
   });
   await tx
     .insert(schema.member)

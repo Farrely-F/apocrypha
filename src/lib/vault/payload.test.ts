@@ -152,6 +152,34 @@ describe("parseVaultPayload workspace", () => {
     }
   });
 
+  it("accepts a P-256 wrap for a P-256 key and rejects a wrap of the wrong length", async () => {
+    const v = await createVault("correct horse battery staple", { alg: "p256" });
+    expect(v.keyPair.publicKey).toContain("|p256|");
+    const envId = crypto.randomUUID();
+    const wrappedKey = await wrapEnvironmentKey(generateEnvironmentKey(), v.keyPair.publicKey, {
+      envId,
+      keyVersion: 1,
+    });
+    expect(wrappedKey).toContain("p256-hkdf-a256gcm");
+    const p256 = {
+      publicKey: v.keyPair.publicKey,
+      passphraseBlob: v.passphraseBlob,
+      recoveryBlob: v.recoveryBlob,
+      workspace: { ...good.workspace, envId, wrappedKey },
+    };
+    expect(parseVaultPayload(p256).ok).toBe(true);
+    // An x25519-sized ephemeral key (or a wrap for the other algorithm) is not valid here.
+    const [v1, , eph, ct] = wrappedKey.split("|");
+    const short = [v1, "p256-hkdf-a256gcm", eph.slice(0, 43), ct].join("|");
+    expect(parseVaultPayload({ ...p256, workspace: { ...p256.workspace, wrappedKey: short } }).ok).toBe(
+      false,
+    );
+    expect(
+      parseVaultPayload({ ...p256, workspace: { ...p256.workspace, wrappedKey: good.workspace.wrappedKey } })
+        .ok,
+    ).toBe(false);
+  });
+
   it("trims names, and requires them non-empty, bounded and free of control characters", () => {
     const r = parseVaultPayload(withWorkspace({ orgName: "  Personal  " }));
     expect(r.ok && r.value.workspace.orgName).toBe("Personal");

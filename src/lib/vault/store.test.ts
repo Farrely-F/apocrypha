@@ -69,7 +69,7 @@ describe("vault store", () => {
     expect(row?.passphraseBlob).toBe(p.passphraseBlob);
 
     const [org] = await db.select().from(schema.organization);
-    expect(org).toMatchObject({ id: r.orgId, name: "Personal" });
+    expect(org).toMatchObject({ id: r.orgId, name: "Personal", slug: `personal-${r.orgId}` });
     const [m] = await db.select().from(schema.member);
     expect(m).toMatchObject({ organizationId: r.orgId, userId: "u1", role: "owner" });
     const [proj] = await db.select().from(schema.project);
