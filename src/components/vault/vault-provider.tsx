@@ -117,6 +117,10 @@ export function VaultProvider({
       }
     };
 
+    // The idle clock starts when the vault is actually on screen, not when the
+    // key was stored: a slow first render must not eat the idle window.
+    if (!trusted) void touchSession().then(lockIfGone);
+
     // The keystore decides when time is up, so activity in any tab counts and
     // a session that expired while this tab slept is caught on the next tick.
     const tick = setInterval(() => {

@@ -17,8 +17,11 @@ const field =
 /** The one message for every failed unlock. It must not say which part was wrong. */
 const WRONG = "Incorrect passphrase or damaged vault.";
 
-const minutes = Math.round(IDLE_TIMEOUT_MS / 60_000);
-const idleLabel = IDLE_TIMEOUT_MS >= 60_000 ? `${minutes} minutes` : `${Math.round(IDLE_TIMEOUT_MS / 1000)} seconds`;
+// "15-minute" (an adjective, so no plural).
+const idleLabel =
+  IDLE_TIMEOUT_MS >= 60_000
+    ? `${Math.round(IDLE_TIMEOUT_MS / 60_000)}-minute`
+    : `${Math.round(IDLE_TIMEOUT_MS / 1000)}-second`;
 const trustDays = Math.round(TRUST_TTL_MS / 86_400_000);
 
 type Me = { publicKey: string; passphraseBlob: string };
