@@ -27,3 +27,12 @@ export const newEnvironmentSchema = (taken: ReadonlySet<string>) =>
     }
   });
 export type NewEnvironmentValues = z.infer<ReturnType<typeof newEnvironmentSchema>>;
+
+export const renameSchema = (taken: ReadonlySet<string>, current: string) =>
+  z.object({ name: name("name") }).superRefine((v, ctx) => {
+    const n = v.name.toLowerCase();
+    if (n !== current.toLowerCase() && taken.has(n)) {
+      ctx.addIssue({ code: "custom", path: ["name"], message: `${v.name} is already taken here.` });
+    }
+  });
+export type RenameValues = z.infer<ReturnType<typeof renameSchema>>;

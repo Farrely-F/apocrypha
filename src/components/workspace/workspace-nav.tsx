@@ -4,9 +4,19 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, ChevronsUpDown, Plus } from "lucide-react";
+import { Check, ChevronsUpDown, Pencil, Plus, Trash2 } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -25,8 +35,10 @@ import { generateEnvironmentKey, wrapEnvironmentKey } from "@/lib/crypto";
 import {
   newEnvironmentSchema,
   newProjectSchema,
+  renameSchema,
   type NewEnvironmentValues,
   type NewProjectValues,
+  type RenameValues,
 } from "@/lib/workspace/schemas";
 import { FIRST_KEY_VERSION, environmentPath } from "@/lib/workspace/shared";
 import type { TreeOrg } from "@/lib/workspace/manage";
@@ -60,6 +72,7 @@ export function WorkspaceNav({ tree }: { tree: TreeOrg[] }) {
   const canBuild = org ? org.role === "owner" || org.role === "admin" : false;
   const [newProject, setNewProject] = useState(false);
   const [newEnv, setNewEnv] = useState(false);
+  const [manage, setManage] = useState<{ kind: "project" | "environment"; mode: "rename" | "delete" } | null>(null);
 
   if (!org) return null;
 
@@ -90,6 +103,16 @@ export function WorkspaceNav({ tree }: { tree: TreeOrg[] }) {
               <DropdownMenuItem onClick={() => setNewProject(true)}>
                 <Plus /> New project
               </DropdownMenuItem>
+              {project && (
+                <>
+                  <DropdownMenuItem onClick={() => setManage({ kind: "project", mode: "rename" })}>
+                    <Pencil /> Rename project
+                  </DropdownMenuItem>
+                  <DropdownMenuItem variant="destructive" onClick={() => setManage({ kind: "project", mode: "delete" })}>
+                    <Trash2 /> Delete project
+                  </DropdownMenuItem>
+                </>
+              )}
             </>
           )}
         </DropdownMenuContent>
@@ -117,6 +140,20 @@ export function WorkspaceNav({ tree }: { tree: TreeOrg[] }) {
               <DropdownMenuItem onClick={() => setNewEnv(true)}>
                 <Plus /> New environment
               </DropdownMenuItem>
+              {env && (
+                <>
+                  <DropdownMenuItem onClick={() => setManage({ kind: "environment", mode: "rename" })}>
+                    <Pencil /> Rename environment
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    variant="destructive"
+                    disabled={project.environments.length < 2}
+                    onClick={() => setManage({ kind: "environment", mode: "delete" })}
+                  >
+                    <Trash2 /> Delete environment
+                  </DropdownMenuItem>
+                </>
+              )}
             </>
           )}
         </DropdownMenuContent>
@@ -129,6 +166,20 @@ export function WorkspaceNav({ tree }: { tree: TreeOrg[] }) {
           projectId={project.id}
           projectName={project.name}
           taken={new Set(project.environments.map((e) => e.name.toLowerCase()))}
+        />
+      )}
+      {manage && project && (
+        <ManageDialog
+          key={`${manage.kind}-${manage.mode}`}
+          {...manage}
+          target={
+            manage.kind === "project"
+              ? { id: project.id, name: project.name, url: `/api/projects/${project.id}`, siblings: org.projects.map((p) => p.name) }
+              : env
+                ? { id: env.id, name: env.name, url: `/api/environments/${env.id}`, siblings: project.environments.map((e) => e.name) }
+                : null
+          }
+          onClose={() => setManage(null)}
         />
       )}
       <NewProjectDialog
@@ -305,6 +356,122 @@ function NewEnvironmentDialog({
           <DialogFooter className="mt-6">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Creating" : "Create environment"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+type Target = { id: string; name: string; url: string; siblings: string[] };
+
+async function call(url: string, method: "PATCH" | "DELETE", body?: unknown) {
+  const res = await fetch(url, { method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  if (!res.ok) throw new Error(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? "The server could not do that. Try again.");
+}
+
+/** Rename (a form) or delete (a confirmation) of the current project or environment. */
+function ManageDialog({
+  kind,
+  mode,
+  target,
+  onClose,
+}: {
+  kind: "project" | "environment";
+  mode: "rename" | "delete";
+  target: Target | null;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const taken = useMemo(() => new Set((target?.siblings ?? []).map((n) => n.toLowerCase())), [target]);
+  const resolver = useMemo(() => zodResolver(renameSchema(taken, target?.name ?? "")), [taken, target]);
+  const form = useForm<RenameValues>({ resolver, defaultValues: { name: target?.name ?? "" } });
+  if (!target) return null;
+
+  async function rename(values: RenameValues) {
+    try {
+      await call(target!.url, "PATCH", { name: values.name });
+      onClose();
+      router.refresh();
+    } catch (e) {
+      form.setError("root.server", { message: (e as Error).message });
+    }
+  }
+
+  async function remove() {
+    try {
+      await call(target!.url, "DELETE");
+      onClose();
+      router.push("/dashboard");
+      router.refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  if (mode === "delete") {
+    return (
+      <AlertDialog open onOpenChange={(o) => !o && onClose()}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {kind} {target.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {kind === "project"
+                ? "Every environment in it and all of its secrets and history are destroyed."
+                : "Its secrets and their history are destroyed."}{" "}
+              This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={remove}>
+              Delete {kind}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <form onSubmit={form.handleSubmit(rename)} noValidate className="grid gap-4">
+          <DialogHeader>
+            <DialogTitle>Rename {kind}</DialogTitle>
+            <DialogDescription>Only the name changes. Keys and secrets stay as they are.</DialogDescription>
+          </DialogHeader>
+          <FieldGroup>
+            <Controller
+              name="name"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="rename-name">Name</FieldLabel>
+                  <Input {...field} id="rename-name" autoFocus autoComplete="off" aria-invalid={fieldState.invalid} />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+          </FieldGroup>
+          {form.formState.errors.root?.server && (
+            <Alert variant="destructive">
+              <AlertDescription>{form.formState.errors.root.server.message}</AlertDescription>
+            </Alert>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={form.formState.isSubmitting}>
+              Rename
             </Button>
           </DialogFooter>
         </form>

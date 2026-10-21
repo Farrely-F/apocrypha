@@ -150,3 +150,73 @@ async function insertEnvironment(tx: Tx, userId: string, projectId: string, env:
     wrappedKey: env.wrappedKey,
   });
 }
+
+export type ManageResult = { status: "ok" } | { status: "forbidden" | "not-found" | "name-taken" | "last-environment" };
+
+/** The org role of the caller over a project or environment, or null (which reads as not found). */
+async function roleOver(db: Db, userId: string, target: { projectId: string } | { envId: string }) {
+  const rows =
+    "projectId" in target
+      ? await db
+          .select({ orgId: schema.project.organizationId, projectId: schema.project.id })
+          .from(schema.project)
+          .where(eq(schema.project.id, target.projectId))
+          .limit(1)
+      : await db
+          .select({ orgId: schema.project.organizationId, projectId: schema.project.id })
+          .from(schema.environment)
+          .innerJoin(schema.project, eq(schema.project.id, schema.environment.projectId))
+          .where(eq(schema.environment.id, target.envId))
+          .limit(1);
+  const found = rows[0];
+  const role = found ? await roleIn(db, userId, found.orgId) : null;
+  return found && role ? { ...found, role } : null;
+}
+
+export async function renameProject(db: Db, userId: string, projectId: string, name: string): Promise<ManageResult> {
+  const t = await roleOver(db, userId, { projectId });
+  if (!t) return { status: "not-found" };
+  if (!BUILDERS.includes(t.role)) return { status: "forbidden" };
+  const [dup] = await db
+    .select({ id: schema.project.id })
+    .from(schema.project)
+    .where(and(eq(schema.project.organizationId, t.orgId), eq(schema.project.name, name)))
+    .limit(1);
+  if (dup && dup.id !== projectId) return { status: "name-taken" };
+  await db.update(schema.project).set({ name }).where(eq(schema.project.id, projectId));
+  return { status: "ok" };
+}
+
+/** Removes the project, its environments, keys and every secret version (cascade). */
+export async function deleteProject(db: Db, userId: string, projectId: string): Promise<ManageResult> {
+  const t = await roleOver(db, userId, { projectId });
+  if (!t) return { status: "not-found" };
+  if (!BUILDERS.includes(t.role)) return { status: "forbidden" };
+  await db.delete(schema.project).where(eq(schema.project.id, projectId));
+  return { status: "ok" };
+}
+
+export async function renameEnvironment(db: Db, userId: string, envId: string, name: string): Promise<ManageResult> {
+  const t = await roleOver(db, userId, { envId });
+  if (!t) return { status: "not-found" };
+  if (!BUILDERS.includes(t.role)) return { status: "forbidden" };
+  const [dup] = await db
+    .select({ id: schema.environment.id })
+    .from(schema.environment)
+    .where(and(eq(schema.environment.projectId, t.projectId), eq(schema.environment.name, name)))
+    .limit(1);
+  if (dup && dup.id !== envId) return { status: "name-taken" };
+  await db.update(schema.environment).set({ name }).where(eq(schema.environment.id, envId));
+  return { status: "ok" };
+}
+
+/** A project keeps at least one environment; to remove the last one, delete the project. */
+export async function deleteEnvironment(db: Db, userId: string, envId: string): Promise<ManageResult> {
+  const t = await roleOver(db, userId, { envId });
+  if (!t) return { status: "not-found" };
+  if (!BUILDERS.includes(t.role)) return { status: "forbidden" };
+  const siblings = await db.select({ id: schema.environment.id }).from(schema.environment).where(eq(schema.environment.projectId, t.projectId)).limit(2);
+  if (siblings.length < 2) return { status: "last-environment" };
+  await db.delete(schema.environment).where(eq(schema.environment.id, envId));
+  return { status: "ok" };
+}

@@ -8,7 +8,7 @@ import { migrate } from "drizzle-orm/libsql/migrator";
 import { beforeAll, describe, expect, it } from "vitest";
 import * as schema from "../db/schema";
 import { createVaultRecord } from "../vault/store";
-import { createEnvironment, createProject, listWorkspaceTree } from "./manage";
+import { createEnvironment, createProject, deleteEnvironment, deleteProject, listWorkspaceTree, renameEnvironment, renameProject } from "./manage";
 import type { WorkspaceIds } from "./shared";
 
 let db: ReturnType<typeof drizzle<typeof schema>>;
@@ -75,5 +75,35 @@ describe("projects and environments", () => {
     expect((await createEnvironment(db, "bob", alice.projectId, env("nope"))).status).toBe("not-found");
     expect((await createEnvironment(db, "alice", crypto.randomUUID(), env("nope"))).status).toBe("not-found");
     expect(await db.select().from(schema.project).where(eq(schema.project.name, "Nope"))).toHaveLength(0);
+  });
+});
+
+describe("rename and delete", () => {
+  it("renames, refusing a taken name; outsiders get not-found, members forbidden", async () => {
+    const e = env("tmp");
+    await createEnvironment(db, "alice", alice.projectId, e);
+    expect((await renameEnvironment(db, "alice", e.id, "staging")).status).toBe("name-taken");
+    expect((await renameEnvironment(db, "alice", e.id, "tmp2")).status).toBe("ok");
+    expect((await renameEnvironment(db, "dave", e.id, "z")).status).toBe("forbidden");
+    expect((await renameEnvironment(db, "bob", e.id, "z")).status).toBe("not-found");
+    expect((await renameProject(db, "alice", alice.projectId, "Billing")).status).toBe("name-taken");
+    expect((await renameProject(db, "alice", alice.projectId, "Renamed")).status).toBe("ok");
+    expect((await renameProject(db, "bob", alice.projectId, "z")).status).toBe("not-found");
+  });
+
+  it("deleting an environment removes its keys; the last one cannot be deleted", async () => {
+    const e = env("doomed");
+    await createEnvironment(db, "alice", alice.projectId, e);
+    expect((await deleteEnvironment(db, "dave", e.id)).status).toBe("forbidden");
+    expect((await deleteEnvironment(db, "bob", e.id)).status).toBe("not-found");
+    expect((await deleteEnvironment(db, "alice", e.id)).status).toBe("ok");
+    expect(await db.select().from(schema.environmentKeyGrant).where(eq(schema.environmentKeyGrant.envId, e.id))).toHaveLength(0);
+    const solo = env("only");
+    const p = await createProject(db, "alice", { orgId: alice.orgId, name: "Solo", environment: solo });
+    if (p.status !== "created") throw new Error("setup");
+    expect((await deleteEnvironment(db, "alice", solo.id)).status).toBe("last-environment");
+    expect((await deleteProject(db, "dave", p.projectId)).status).toBe("forbidden");
+    expect((await deleteProject(db, "alice", p.projectId)).status).toBe("ok");
+    expect(await db.select().from(schema.environment).where(eq(schema.environment.id, solo.id))).toHaveLength(0);
   });
 });
