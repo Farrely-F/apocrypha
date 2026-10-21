@@ -13,7 +13,7 @@ function sameOrigin(request: Request) {
   return allowed.has(origin);
 }
 
-/** Create the signed-in user's vault. Only public key material and wrapped blobs arrive here. */
+/** Create the signed-in user's vault. Only public key material and wrapped blobs arrive here (vault blobs and the first environment grant); the server creates the personal workspace in the same transaction. */
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return json({ error: "Cross-origin request refused." }, 403);
 
@@ -30,9 +30,19 @@ export async function POST(request: Request) {
   const parsed = parseVaultPayload(body);
   if (!parsed.ok) return json({ error: parsed.error }, 400);
 
-  const result = await createVaultRecord(db, session.user.id, parsed.value);
-  if (result === "exists") {
+  let result;
+  try {
+    result = await createVaultRecord(db, session.user.id, parsed.value);
+  } catch (error) {
+    // The transaction rolled back: nothing was created. Log only the error code:
+    // drizzle messages embed the query parameters (our blobs).
+    const cause = error instanceof Error ? (error.cause as { code?: string } | undefined) : undefined;
+    console.error("create vault failed:", cause?.code ?? "unknown error");
+    return json({ error: "The server could not save your vault. Try again." }, 500);
+  }
+  if (result.status === "exists") {
     return json({ error: "A vault already exists for this account." }, 409);
   }
-  return json({ ok: true }, 201);
+  const { orgId, projectId, envId } = result;
+  return json({ ok: true, orgId, projectId, envId }, 201);
 }

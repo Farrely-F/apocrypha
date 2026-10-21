@@ -1,5 +1,12 @@
 import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 // Better Auth core tables (singular names, as the adapter expects).
 // Timestamps are stored as integer milliseconds and mapped to Date.
@@ -95,3 +102,102 @@ export const vault = sqliteTable("vault", {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
+
+// Workspace tables (docs/DESIGN.md sections 4 and 6). Org, project and
+// environment names are plaintext by design; secrets are not stored here.
+//
+// `organization` and `member` deliberately use the table and column names of
+// Better Auth's organization plugin (organization: id, name, slug, logo,
+// created_at, metadata; member: id, organization_id, user_id, role,
+// created_at) so enabling the plugin later (#11) adopts them without a
+// rewrite. The plugin is NOT enabled yet.
+
+export const ORG_ROLES = ["owner", "admin", "member"] as const;
+export type OrgRole = (typeof ORG_ROLES)[number];
+
+export const organization = sqliteTable("organization", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  logo: text("logo"),
+  createdAt: createdAt(),
+  metadata: text("metadata"),
+});
+
+export const member = sqliteTable(
+  "member",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // Text, validated against ORG_ROLES in the app (the plugin allows custom roles later).
+    role: text("role").$type<OrgRole>().notNull().default("member"),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("member_organization_id_idx").on(table.organizationId),
+    index("member_user_id_idx").on(table.userId),
+    uniqueIndex("member_organization_user_uidx").on(table.organizationId, table.userId),
+  ],
+);
+
+export const project = sqliteTable(
+  "project",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [uniqueIndex("project_organization_name_uidx").on(table.organizationId, table.name)],
+);
+
+export const environment = sqliteTable(
+  "environment",
+  {
+    // Generated in the browser: the key wrap binds it (docs/crypto.md section 3).
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    currentKeyVersion: integer("current_key_version").notNull().default(1),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [uniqueIndex("environment_project_name_uidx").on(table.projectId, table.name)],
+);
+
+export const PRINCIPAL_TYPES = ["user", "device", "machine"] as const;
+export type PrincipalType = (typeof PRINCIPAL_TYPES)[number];
+
+// One symmetric key per environment, wrapped to each principal allowed in it.
+// `principal_id` is generic (a user id now; device or machine ids later), so it
+// has no foreign key: whoever removes a principal removes its grants.
+export const environmentKeyGrant = sqliteTable(
+  "environment_key_grant",
+  {
+    envId: text("env_id")
+      .notNull()
+      .references(() => environment.id, { onDelete: "cascade" }),
+    principalType: text("principal_type").$type<PrincipalType>().notNull(),
+    principalId: text("principal_id").notNull(),
+    keyVersion: integer("key_version").notNull(),
+    wrappedKey: text("wrapped_key").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({
+      name: "environment_key_grant_pk",
+      columns: [table.envId, table.principalType, table.principalId, table.keyVersion],
+    }),
+    index("environment_key_grant_principal_idx").on(table.principalType, table.principalId),
+  ],
+);
