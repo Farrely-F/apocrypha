@@ -10,7 +10,7 @@ import * as schema from "../db/schema";
 import { createVaultRecord } from "../vault/store";
 import type { WorkspaceIds } from "../workspace/shared";
 import { parseNewShare } from "./payload";
-import { createShare, listShares, openShare, revokeShare } from "./store";
+import { clearFinishedShares, createShare, listShares, openShare, revokeShare } from "./store";
 
 let db: ReturnType<typeof drizzle<typeof schema>>;
 let ws: WorkspaceIds;
@@ -108,5 +108,26 @@ describe("owner metadata", () => {
     expect(rows![0]).toMatchObject({ envName: "dev", projectName: "P", createdByName: "alice" });
     expect(await listShares(db, "dave", ws.orgId)).toBeNull();
     expect(await listShares(db, "bob", ws.orgId)).toBeNull();
+  });
+});
+
+describe("clearing finished links", () => {
+  it("removes revoked, expired and used-up links, keeps active ones, and only for owners and admins", async () => {
+    const past = new Date(Date.now() - 3 * 86_400_000);
+    const active = await mk({ maxViews: 5 });
+    const used = await mk({ maxViews: 1 });
+    await openShare(db, used);
+    const revoked = await mk({ maxViews: 5 });
+    await revokeShare(db, "alice", revoked);
+    const expired = await mk({ maxViews: undefined, expiresInMinutes: 5 }, past);
+    expect(await clearFinishedShares(db, "dave", ws.orgId, ws.envId)).toEqual({ status: "forbidden" });
+    expect(await clearFinishedShares(db, "bob", ws.orgId, ws.envId)).toEqual({ status: "not-found" });
+    const r = await clearFinishedShares(db, "alice", ws.orgId, ws.envId);
+    expect(r.status).toBe("ok");
+    const left = (await listShares(db, "alice", ws.orgId))!.map((s) => s.id);
+    expect(left).toContain(active);
+    for (const gone of [used, revoked, expired]) expect(left).not.toContain(gone);
+    // a second call has nothing left to do
+    expect(await clearFinishedShares(db, "alice", ws.orgId, ws.envId)).toMatchObject({ status: "ok", removed: 0 });
   });
 });

@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import type { LibSQLDatabase } from "drizzle-orm/libsql";
 import * as schema from "../db/schema";
 import type { OrgRole } from "../db/schema";
@@ -137,4 +137,29 @@ export async function openShare(db: Db, shareId: string, now = new Date()): Prom
       expiresAt: schema.share.expiresAt,
     });
   return row ?? null;
+}
+
+/**
+ * Delete this environment's finished links (revoked, expired or out of views) so the list stays short.
+ * Active links are never touched. The audit log keeps the history.
+ */
+export async function clearFinishedShares(db: Db, userId: string, orgId: string, envId: string, now = new Date()): Promise<{ status: "ok"; removed: number } | { status: "forbidden" | "not-found" }> {
+  const role = await roleIn(db, userId, orgId);
+  if (!role) return { status: "not-found" };
+  if (!BUILDERS.includes(role)) return { status: "forbidden" };
+  const gone = await db
+    .delete(schema.share)
+    .where(
+      and(
+        eq(schema.share.organizationId, orgId),
+        eq(schema.share.envId, envId),
+        or(
+          isNotNull(schema.share.revokedAt),
+          and(isNotNull(schema.share.expiresAt), lte(schema.share.expiresAt, now)),
+          and(isNotNull(schema.share.maxViews), sql`${schema.share.views} >= ${schema.share.maxViews}`),
+        ),
+      ),
+    )
+    .returning({ id: schema.share.id });
+  return { status: "ok", removed: gone.length };
 }

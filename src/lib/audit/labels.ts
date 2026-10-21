@@ -55,6 +55,8 @@ export function describeEvent(e: { type: string; actorName: string | null; envNa
       return `created a share link${env}${d.passwordProtected ? " with a password" : ""}`;
     case "share.revoked":
       return `revoked a share link${env}`;
+    case "share.cleared":
+      return `cleared ${typeof d.removed === "number" ? d.removed : "some"} finished share link${d.removed === 1 ? "" : "s"}${env}`;
     case "share.opened":
       return `a guest opened a share link${env}`;
     case "account.passphrase_changed":

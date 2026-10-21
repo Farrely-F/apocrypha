@@ -170,16 +170,16 @@ export function InviteDialog({ org, open, onOpenChange }: { org: TreeOrg; open: 
           </form>
         )}
         {pending.length > 0 && (
-          <div className="grid gap-1 border-t pt-3 text-sm">
+          <div className="grid min-w-0 gap-2 border-t pt-3 text-sm">
             <span className="text-bone-faint">Pending invites</span>
             {pending.map((p) => (
-              <div key={p.id} className="flex items-center justify-between gap-2">
-                <span className="truncate">
-                  {p.email ?? "Anyone with the link"}{" "}
-                  <span className="text-bone-faint">until {new Date(p.expiresAt).toLocaleString()}</span>
-                </span>
+              <div key={p.id} className="flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate">{p.email ?? "Anyone with the link"}</div>
+                  <div className="text-xs text-bone-faint">until {new Date(p.expiresAt).toLocaleString()}</div>
+                </div>
                 <Tooltip>
-                  <TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label="Revoke invite" onClick={() => void revoke(p.id)} />}>
+                  <TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0" aria-label="Revoke invite" onClick={() => void revoke(p.id)} />}>
                     <X />
                   </TooltipTrigger>
                   <TooltipContent>Revoke</TooltipContent>

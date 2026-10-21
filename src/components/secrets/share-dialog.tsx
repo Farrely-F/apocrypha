@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, Copy, Link2, Lock, X } from "lucide-react";
+import { Check, Copy, Link2, Lock, Trash2, X } from "lucide-react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -66,6 +66,7 @@ export function ShareDialog({
   const [copied, setCopied] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
   const [asOf, setAsOf] = useState(0);
+  const [showFinished, setShowFinished] = useState(false);
   const form = useForm<NewShareValues>({
     resolver: zodResolver(newShareSchema),
     defaultValues: { protect: false, password: "", expiry: "1440", views: "1" },
@@ -106,6 +107,15 @@ export function ShareDialog({
     } catch (e) {
       form.setError("root.server", { message: (e as Error).message });
     }
+  }
+
+  const active = rows.filter((r) => status(r, asOf) === "active");
+  const finished = rows.filter((r) => status(r, asOf) !== "active");
+
+  async function clearFinished() {
+    await call(`/api/organizations/${orgId}/shares?env=${envId}`, { method: "DELETE" }).catch(() => null);
+    setShowFinished(false);
+    void load();
   }
 
   async function revoke(id: string) {
@@ -243,35 +253,68 @@ export function ShareDialog({
         )}
 
         {rows.length > 0 && (
-          <div className="grid gap-1 border-t pt-3 text-sm">
-            <span className="text-bone-faint">Links from this environment</span>
-            {rows.map((r) => {
-              const s = status(r, asOf);
-              return (
-                <div key={r.id} className="flex items-center justify-between gap-2">
-                  <span className="flex min-w-0 items-center gap-2">
-                    {r.passwordProtected && <Lock className="size-3.5 shrink-0 text-bone-faint" aria-label="Password protected" />}
-                    <span className="truncate">
-                      {r.itemCount} secret{r.itemCount === 1 ? "" : "s"}, {r.views}
-                      {r.maxViews !== null ? ` of ${r.maxViews}` : ""} view{r.views === 1 ? "" : "s"}
-                      {r.expiresAt ? `, until ${new Date(r.expiresAt).toLocaleString()}` : ""}
-                    </span>
-                    <span className={s === "active" ? "text-signal" : "text-bone-faint"}>{s}</span>
-                  </span>
-                  {s === "active" && (
-                    <Tooltip>
-                      <TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label="Revoke link" onClick={() => void revoke(r.id)} />}>
-                        <X />
-                      </TooltipTrigger>
-                      <TooltipContent>Revoke</TooltipContent>
-                    </Tooltip>
-                  )}
+          <div className="grid min-w-0 gap-2 border-t pt-3 text-sm">
+            <span className="text-bone-faint">
+              Active links{active.length ? ` (${active.length})` : ""}
+            </span>
+            {active.length === 0 && <span className="text-xs text-bone-faint">None. Create one above.</span>}
+            <div className="grid max-h-44 gap-2 overflow-y-auto">
+              {active.map((r) => (
+                <LinkRow key={r.id} r={r} state="active" onRevoke={() => void revoke(r.id)} />
+              ))}
+            </div>
+            {finished.length > 0 && (
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <Button type="button" variant="link" size="sm" className="h-auto px-0 text-bone-faint" onClick={() => setShowFinished((v) => !v)} aria-expanded={showFinished}>
+                    {showFinished ? "Hide" : "Show"} {finished.length} finished link{finished.length === 1 ? "" : "s"}
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => void clearFinished()}>
+                    <Trash2 data-icon="inline-start" />
+                    Clear finished
+                  </Button>
                 </div>
-              );
-            })}
+                {showFinished && (
+                  <div className="grid max-h-44 gap-2 overflow-y-auto opacity-70">
+                    {finished.map((r) => (
+                      <LinkRow key={r.id} r={r} state={status(r, asOf)} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function LinkRow({ r, state, onRevoke }: { r: Row; state: string; onRevoke?: () => void }) {
+  return (
+    <div className="flex min-w-0 items-start justify-between gap-3">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-x-2">
+          {r.passwordProtected && <Lock className="size-3.5 shrink-0 text-bone-faint" aria-label="Password protected" />}
+          <span>
+            {r.itemCount} secret{r.itemCount === 1 ? "" : "s"}
+          </span>
+          <span className="text-bone-faint">
+            {r.views}
+            {r.maxViews !== null ? ` of ${r.maxViews}` : ""} view{r.views === 1 ? "" : "s"}
+          </span>
+          <span className={state === "active" ? "text-signal" : "text-blood"}>{state}</span>
+        </div>
+        {r.expiresAt && <div className="text-xs text-bone-faint">until {new Date(r.expiresAt).toLocaleString()}</div>}
+      </div>
+      {onRevoke && (
+        <Tooltip>
+          <TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0" aria-label="Revoke link" onClick={onRevoke} />}>
+            <X />
+          </TooltipTrigger>
+          <TooltipContent>Revoke</TooltipContent>
+        </Tooltip>
+      )}
+    </div>
   );
 }
