@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import { Pane } from "@/components/shell";
@@ -84,7 +85,13 @@ export function RecoveryForm({ email, me, onBack, onUnlocked }: { email: string;
             Back
           </Button>
         </div>
-        <FieldDescription className="mt-4">Lost the recovery key too? Resetting is possible but only recovers what teammates can re-share.</FieldDescription>
+        <FieldDescription className="mt-4">
+          Lost the recovery key too?{" "}
+          <Link href="/vault/reset" className="text-signal underline">
+            Reset your vault
+          </Link>
+          . It only recovers what an admin can re-share.
+        </FieldDescription>
       </Pane>
     </form>
   );

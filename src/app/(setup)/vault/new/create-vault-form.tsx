@@ -24,7 +24,7 @@ import {
   type RecoveryConfirmValues,
 } from "@/lib/vault/schemas";
 import { passphraseStrength, type StrengthLevel } from "@/lib/vault/strength";
-import { setUnlockedKeyPair } from "@/lib/vault/unlocked";
+import { lock as lockStore, setUnlockedKeyPair } from "@/lib/vault/unlocked";
 import {
   DEFAULT_WORKSPACE_NAMES,
   FIRST_KEY_VERSION,
@@ -39,20 +39,22 @@ const meter: Record<StrengthLevel, { value: number; color: string }> = {
   strong: { value: 100, color: "[&_[data-slot=progress-indicator]]:bg-signal" },
 };
 
-export function CreateVaultForm({ email }: { email: string }) {
+export type VaultMode = "create" | "reset";
+
+export function CreateVaultForm({ email, mode = "create" }: { email: string; mode?: VaultMode }) {
   const [vault, setVault] = useState<CreatedVault | null>(null);
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-8 pt-6">
       {vault ? (
-        <RecoveryStep email={email} vault={vault} onDiscard={() => setVault(null)} />
+        <RecoveryStep email={email} vault={vault} mode={mode} onDiscard={() => setVault(null)} />
       ) : (
-        <PassphraseStep email={email} onSealed={setVault} />
+        <PassphraseStep email={email} mode={mode} onSealed={setVault} />
       )}
     </div>
   );
 }
 
-function PassphraseStep({ email, onSealed }: { email: string; onSealed: (v: CreatedVault) => void }) {
+function PassphraseStep({ email, mode, onSealed }: { email: string; mode: VaultMode; onSealed: (v: CreatedVault) => void }) {
   const form = useForm<CreateVaultValues>({
     resolver: zodResolver(createVaultSchema),
     defaultValues: { passphrase: "", confirm: "" },
@@ -79,7 +81,7 @@ function PassphraseStep({ email, onSealed }: { email: string; onSealed: (v: Crea
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
-      <Pane title="Create your vault" meta={email}>
+      <Pane title={mode === "reset" ? "Set up your new vault" : "Create your vault"} meta={email}>
         <p className="max-w-[60ch] text-bone-dim">
           Your passphrase locks a key that only this browser holds. We store the locked key and never the passphrase,
           so we can&apos;t reset it. You&apos;ll enter it on every new device.
@@ -153,10 +155,12 @@ function PassphraseStep({ email, onSealed }: { email: string; onSealed: (v: Crea
 function RecoveryStep({
   email,
   vault,
+  mode,
   onDiscard,
 }: {
   email: string;
   vault: CreatedVault;
+  mode: VaultMode;
   onDiscard: () => void;
 }) {
   const router = useRouter();
@@ -205,7 +209,7 @@ function RecoveryStep({
       } finally {
         envKey.fill(0);
       }
-      const res = await fetch("/api/vault", {
+      const res = await fetch(mode === "reset" ? "/api/vault/reset" : "/api/vault", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -225,6 +229,9 @@ function RecoveryStep({
         return;
       }
       const ids = (await res.json().catch(() => null)) as Partial<WorkspaceIds> | null;
+      // A reset replaces the key pair: forget every stored copy of the old one (all tabs, trusted device)
+      // before the new one is adopted.
+      if (mode === "reset") await lockStore();
       setUnlockedKeyPair(vault.keyPair);
       // Next keeps this page mounted but hidden after navigating away, so drop
       // the recovery key and the typed confirmation from state and the DOM now.
@@ -294,7 +301,7 @@ function RecoveryStep({
 
         <div className="mt-6 flex items-center gap-3">
           <Button type="submit" disabled={!isValid || isSubmitting}>
-            {isSubmitting ? "Saving vault" : "Create vault"}
+            {isSubmitting ? "Saving vault" : mode === "reset" ? "Reset vault" : "Create vault"}
           </Button>
           <span className="text-xs text-bone-faint">Nothing is saved to the server until you confirm.</span>
         </div>

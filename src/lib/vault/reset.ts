@@ -7,11 +7,14 @@ import type { VaultPayload } from "./payload";
 type Db = LibSQLDatabase<typeof schema>;
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
-export type ResetEnv = { envId: string; projectId: string; envName: string; projectName: string; orgName: string; orgId: string };
+type ResetEnvBase = { envId: string; projectId: string; envName: string; projectName: string; orgName: string; orgId: string };
+export type ResetEnv = ResetEnvBase & { managed: boolean };
 export type ResetImpact = {
   /** An owner or admin who still holds the current key can share these again with the new key. */
   recoverable: ResetEnv[];
-  /** Nobody else can open these, so once the old key is gone their secrets are unreadable. */
+  /** Others hold a key but no owner or admin does yet. Kept; re-sharing waits for an admin who can open them. */
+  waiting: ResetEnv[];
+  /** Nobody else holds a key, so their secrets become unreadable. Deleted only where you manage the organisation, otherwise left in place. */
   lost: ResetEnv[];
 };
 
@@ -25,15 +28,16 @@ export async function previewReset(db: Db | Tx, userId: string): Promise<ResetIm
       projectName: schema.project.name,
       orgName: schema.organization.name,
       orgId: schema.organization.id,
-      current: schema.environment.currentKeyVersion,
+      role: schema.member.role,
     })
     .from(schema.environmentKeyGrant)
     .innerJoin(schema.environment, eq(schema.environment.id, schema.environmentKeyGrant.envId))
     .innerJoin(schema.project, eq(schema.project.id, schema.environment.projectId))
     .innerJoin(schema.organization, eq(schema.organization.id, schema.project.organizationId))
+    .innerJoin(schema.member, and(eq(schema.member.organizationId, schema.organization.id), eq(schema.member.userId, userId)))
     .where(and(eq(schema.environmentKeyGrant.principalType, "user"), eq(schema.environmentKeyGrant.principalId, userId)))
     .groupBy(schema.environment.id);
-  const impact: ResetImpact = { recoverable: [], lost: [] };
+  const impact: ResetImpact = { recoverable: [], waiting: [], lost: [] };
   if (mine.length === 0) return impact;
 
   // Someone else who can re-share: an owner or admin of that org holding the current key version.
@@ -56,9 +60,23 @@ export async function previewReset(db: Db | Tx, userId: string): Promise<ResetIm
       ),
     );
   const helped = new Set(helpers.map((h) => h.envId));
+  // Anyone else who holds any key for the environment, whatever their role.
+  const others = await db
+    .select({ envId: schema.environmentKeyGrant.envId })
+    .from(schema.environmentKeyGrant)
+    .where(and(inArray(schema.environmentKeyGrant.envId, mine.map((m) => m.envId)), eq(schema.environmentKeyGrant.principalType, "user"), ne(schema.environmentKeyGrant.principalId, userId)));
+  const shared = new Set(others.map((o) => o.envId));
   for (const m of mine) {
-    const env: ResetEnv = { envId: m.envId, projectId: m.projectId, envName: m.envName, projectName: m.projectName, orgName: m.orgName, orgId: m.orgId };
-    (helped.has(env.envId) ? impact.recoverable : impact.lost).push(env);
+    const env: ResetEnv = {
+      envId: m.envId,
+      projectId: m.projectId,
+      envName: m.envName,
+      projectName: m.projectName,
+      orgName: m.orgName,
+      orgId: m.orgId,
+      managed: m.role === "owner" || m.role === "admin",
+    };
+    (helped.has(env.envId) ? impact.recoverable : shared.has(env.envId) ? impact.waiting : impact.lost).push(env);
   }
   return impact;
 }
@@ -84,17 +102,19 @@ export async function resetVault(db: Db, userId: string, payload: VaultPayload):
       .set({ publicKey: payload.publicKey, passphraseBlob: payload.passphraseBlob, recoveryBlob: payload.recoveryBlob, updatedAt: new Date() })
       .where(eq(schema.vault.userId, userId));
     await tx.delete(schema.environmentKeyGrant).where(and(eq(schema.environmentKeyGrant.principalType, "user"), eq(schema.environmentKeyGrant.principalId, userId)));
-    if (impact.recoverable.length) {
-      await tx.insert(schema.regrantRequest).values(impact.recoverable.map((e) => ({ envId: e.envId, userId })));
-    }
-    if (impact.lost.length) {
-      await tx.delete(schema.environment).where(inArray(schema.environment.id, impact.lost.map((e) => e.envId)));
+    const requests = [...impact.recoverable, ...impact.waiting];
+    if (requests.length) await tx.insert(schema.regrantRequest).values(requests.map((e) => ({ envId: e.envId, userId })));
+    // Only environments nobody else can open AND that this user has the authority to delete.
+    // In an organisation where they are a plain member, the environment is left in place.
+    const deletable = impact.lost.filter((e) => e.managed);
+    if (deletable.length) {
+      await tx.delete(schema.environment).where(inArray(schema.environment.id, deletable.map((e) => e.envId)));
       // Projects left without an environment, then organisations left empty with only this user in them.
       await tx
         .delete(schema.project)
         .where(
           and(
-            inArray(schema.project.id, impact.lost.map((e) => e.projectId)),
+            inArray(schema.project.id, deletable.map((e) => e.projectId)),
             sql`${schema.project.id} not in (select ${schema.environment.projectId} from ${schema.environment})`,
           ),
         );

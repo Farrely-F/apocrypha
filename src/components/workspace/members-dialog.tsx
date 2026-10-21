@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { UserMinus } from "lucide-react";
+import { ShieldCheck, UserMinus } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -59,12 +59,15 @@ export function MembersDialog({ org, open, onOpenChange }: { org: TreeOrg; open:
   const [removing, setRemoving] = useState<Member | null>(null);
   const [busy, setBusy] = useState(false);
   const [changed, setChanged] = useState<string[]>([]);
+  const [needsAccess, setNeedsAccess] = useState<string[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
   const [done, setDone] = useState<{ who: string; exposed: Exposed } | null>(null);
   const myRole = members.find((m) => m.userId === me)?.role;
 
   const load = useCallback(async () => {
     try {
-      const data = await call<{ members: Member[]; me: string }>(`/api/organizations/${org.id}/members`);
+      const data = await call<{ members: Member[]; me: string; needsAccess: string[] }>(`/api/organizations/${org.id}/members`);
+      setNeedsAccess(data.needsAccess);
       setMembers(data.members);
       setMe(data.me);
       setChanged(checkPins(org.id, data.members));
@@ -90,6 +93,64 @@ export function MembersDialog({ org, open, onOpenChange }: { org: TreeOrg; open:
       router.refresh();
     } catch (e) {
       setError((e as Error).message);
+    }
+  }
+
+  // After someone resets their vault their old grants are gone, and their old key may be lost or stolen,
+  // so re-sharing also rotates: a new key version for everyone who holds a current key plus the member's
+  // NEW key, and the older versions for the member so history stays readable.
+  async function regrant(m: Member) {
+    if (!keyPair) return setError("Unlock your vault first.");
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      if (changed.includes(m.userId)) throw new Error("This person's key changed, as expected after a reset. Compare the new fingerprint with them, then accept it above before sharing.");
+      const plan = await call<{
+        publicKey: string;
+        environments: { envId: string; envName: string; projectName: string; currentKeyVersion: number; keyVersions: number[]; recipients: { userId: string; publicKey: string }[] }[];
+        skipped: string[];
+      }>(`/api/organizations/${org.id}/members/${m.userId}/regrant`);
+      if (plan.publicKey !== m.publicKey) throw new Error("The key the server returned does not match the one in the members list. Nothing was shared.");
+      const listed = new Map(members.map((x) => [x.userId, x.publicKey]));
+      const envs = [];
+      for (const env of plan.environments) {
+        for (const r of env.recipients) {
+          if (r.userId === m.userId || listed.get(r.userId) !== r.publicKey || changed.includes(r.userId)) {
+            throw new Error("A recipient's key does not match what you were shown. Nothing was changed. Check the fingerprints and reload.");
+          }
+        }
+        const keys = await fetchEnvironmentKeys(env.envId, keyPair);
+        const fresh = generateEnvironmentKey();
+        try {
+          const nv = env.currentKeyVersion + 1;
+          const forTarget = [];
+          for (const v of env.keyVersions) {
+            const key = keys.get(v);
+            if (!key) throw new Error(`You cannot open ${env.projectName} / ${env.envName}.`);
+            forTarget.push({ keyVersion: v, wrappedKey: await wrapEnvironmentKey(key, plan.publicKey, { envId: env.envId, keyVersion: v }) });
+          }
+          forTarget.push({ keyVersion: nv, wrappedKey: await wrapEnvironmentKey(fresh, plan.publicKey, { envId: env.envId, keyVersion: nv }) });
+          const forOthers = await Promise.all(
+            env.recipients.map(async (r) => ({ userId: r.userId, wrappedKey: await wrapEnvironmentKey(fresh, r.publicKey, { envId: env.envId, keyVersion: nv }) })),
+          );
+          envs.push({ envId: env.envId, forTarget, forOthers });
+        } finally {
+          fresh.fill(0);
+          keys.forEach((k) => k.fill(0));
+        }
+      }
+      await call(`/api/organizations/${org.id}/members/${m.userId}/regrant`, { method: "POST", body: JSON.stringify({ envs }) });
+      setNotice(
+        `${m.name || m.email} can open ${plan.environments.map((e) => `${e.projectName} / ${e.envName}`).join(", ")} again, with a new key version.` +
+          (plan.skipped.length ? ` Still waiting on someone who can open: ${plan.skipped.join(", ")}.` : ""),
+      );
+      await load();
+      router.refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -156,6 +217,11 @@ export function MembersDialog({ org, open, onOpenChange }: { org: TreeOrg; open:
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
+          {notice && (
+            <Alert>
+              <AlertDescription>{notice}</AlertDescription>
+            </Alert>
+          )}
           {changed.length > 0 && (
             <Alert variant="destructive">
               <AlertDescription className="grid gap-2">
@@ -195,14 +261,18 @@ export function MembersDialog({ org, open, onOpenChange }: { org: TreeOrg; open:
                   <TableHead>Person</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Key fingerprint</TableHead>
-                  <TableHead className="w-12" />
+                  <TableHead className="w-24" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {members.map((m) => (
                   <TableRow key={m.userId}>
                     <TableCell>
-                      <div className="truncate">{m.name}{m.userId === me && <span className="text-bone-faint"> (you)</span>}</div>
+                      <div className="truncate">
+                        {m.name}
+                        {m.userId === me && <span className="text-bone-faint"> (you)</span>}
+                        {needsAccess.includes(m.userId) && <span className="ml-2 text-xs text-blood">needs access</span>}
+                      </div>
                       <div className="truncate text-xs text-bone-faint">{m.email}</div>
                     </TableCell>
                     <TableCell>
@@ -223,6 +293,15 @@ export function MembersDialog({ org, open, onOpenChange }: { org: TreeOrg; open:
                     </TableCell>
                     <TableCell className="font-mono text-xs text-bone-faint">{prints[m.userId] ?? "..."}</TableCell>
                     <TableCell>
+                      <span className="flex justify-end gap-1">
+                      {needsAccess.includes(m.userId) && (
+                        <Tooltip>
+                          <TooltipTrigger render={<Button variant="ghost" size="icon-sm" disabled={busy} aria-label={`Re-grant access to ${m.name}`} onClick={() => void regrant(m)} />}>
+                            <ShieldCheck />
+                          </TooltipTrigger>
+                          <TooltipContent>Re-grant access</TooltipContent>
+                        </Tooltip>
+                      )}
                       {mayRemove(m) && (
                         <Tooltip>
                           <TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`Remove ${m.name}`} onClick={() => setRemoving(m)} />}>
@@ -231,6 +310,7 @@ export function MembersDialog({ org, open, onOpenChange }: { org: TreeOrg; open:
                           <TooltipContent>Remove</TooltipContent>
                         </Tooltip>
                       )}
+                      </span>
                     </TableCell>
                   </TableRow>
                 ))}

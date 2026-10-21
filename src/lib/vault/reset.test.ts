@@ -66,7 +66,10 @@ describe("reset to a new key pair", () => {
   it("previews what can be recovered and what is lost", async () => {
     const p = await previewReset(db, "carol");
     expect(p.recoverable.map((e) => e.envId)).toEqual([shared.envId]); // alice (owner) also holds it
-    expect(p.lost.map((e) => e.envId).sort()).toEqual([carol.envId, hidden.envId].sort()); // her own, and one nobody can re-share
+    expect(p.waiting.map((e) => e.envId)).toEqual([]);
+    expect(p.lost.map((e) => ({ id: e.envId, managed: e.managed })).sort((x, y) => x.id.localeCompare(y.id))).toEqual(
+      [{ id: carol.envId, managed: true }, { id: hidden.envId, managed: false }].sort((x, y) => x.id.localeCompare(y.id)),
+    ); // her own personal one, and one in an org where she is only a member
   });
 
   it("swaps the key, drops old grants and lost environments, records requests, seeds a workspace", async () => {
@@ -76,7 +79,9 @@ describe("reset to a new key pair", () => {
     expect((await getVaultRecord(db, "carol"))!.publicKey).toBe(NEWPUB);
     expect(await grantsOf("carol")).toEqual([p.workspace.envId]); // only the new environment
     expect(await db.select().from(schema.environment).where(eq(schema.environment.id, carol.envId))).toHaveLength(0);
-    expect(await db.select().from(schema.environment).where(eq(schema.environment.id, hidden.envId))).toHaveLength(0);
+    // in an org where she is a plain member nothing is deleted, even though nobody else can open it
+    expect(await db.select().from(schema.environment).where(eq(schema.environment.id, hidden.envId))).toHaveLength(1);
+    expect(await db.select().from(schema.organization).where(eq(schema.organization.id, hidden.orgId))).toHaveLength(1);
     expect(await db.select().from(schema.organization).where(eq(schema.organization.id, carol.orgId))).toHaveLength(0);
     // other people's data is untouched
     expect(await grantsOf("alice")).toContain(shared.envId);
@@ -88,8 +93,15 @@ describe("reset to a new key pair", () => {
   });
 });
 
-describe("admin re-grant", () => {
-  it("only owners and admins who hold the key, and only the exact set of versions", async () => {
+describe("admin re-grant (rotates the environment key)", () => {
+  const forTarget = (extra: { keyVersion: number; wrappedKey: string }[] = []) => [
+    { keyVersion: 1, wrappedKey: w("t") },
+    { keyVersion: 2, wrappedKey: w("u") },
+    ...extra,
+  ];
+  const good = () => [{ envId: shared.envId, forTarget: forTarget(), forOthers: [{ userId: "alice", wrappedKey: w("a") }] }];
+
+  it("only owners and admins who hold the key, and only the exact versions and recipients", async () => {
     expect(await pendingRegrants(db, "alice", shared.orgId)).toEqual(["carol"]);
     expect(await pendingRegrants(db, "carol", shared.orgId)).toBeNull();
     expect((await planRegrant(db, "carol", shared.orgId, "carol")).status).toBe("forbidden");
@@ -97,17 +109,28 @@ describe("admin re-grant", () => {
     const plan = await planRegrant(db, "alice", shared.orgId, "carol");
     if (plan.status !== "ok") throw new Error(plan.status);
     expect(plan.publicKey).toBe(NEWPUB);
-    expect(plan.environments[0].keyVersions).toEqual([1]);
+    expect(plan.environments[0]).toMatchObject({ currentKeyVersion: 1, keyVersions: [1], recipients: [{ userId: "alice" }] });
 
-    const one = { envId: shared.envId, keyVersion: 1, wrappedKey: w("g") };
-    expect((await applyRegrant(db, "alice", shared.orgId, "carol", [])).status).toBe("bad-grants");
-    expect((await applyRegrant(db, "alice", shared.orgId, "carol", [{ ...one, keyVersion: 2 }])).status).toBe("bad-grants");
-    expect((await applyRegrant(db, "alice", shared.orgId, "carol", [one, one])).status).toBe("bad-grants");
-    expect((await applyRegrant(db, "alice", shared.orgId, "carol", [{ ...one, wrappedKey: "v1|p256-hkdf-a256gcm|x|y" }])).status).toBe("bad-grants");
+    const bad = [
+      [],
+      [{ ...good()[0], forTarget: [{ keyVersion: 1, wrappedKey: w("t") }] }], // no new version for the member
+      [{ ...good()[0], forTarget: [...forTarget(), { keyVersion: 3, wrappedKey: w("x") }] }], // an extra version
+      [{ ...good()[0], forOthers: [] }], // alice would lose the new key
+      [{ ...good()[0], forOthers: [{ userId: "alice", wrappedKey: w("a") }, { userId: "dave", wrappedKey: w("d") }] }], // a stranger
+      [{ ...good()[0], forTarget: [{ keyVersion: 1, wrappedKey: "v1|p256-hkdf-a256gcm|x|y" }, { keyVersion: 2, wrappedKey: w("u") }] }],
+    ];
+    for (const b of bad) expect((await applyRegrant(db, "alice", shared.orgId, "carol", b)).status).toBe("bad-grants");
     expect(await grantsOf("carol")).not.toContain(shared.envId);
+    expect((await db.select().from(schema.environment).where(eq(schema.environment.id, shared.envId)))[0].currentKeyVersion).toBe(1);
+  });
 
-    expect(await applyRegrant(db, "alice", shared.orgId, "carol", [one])).toEqual({ status: "granted", envIds: [shared.envId] });
-    expect(await grantsOf("carol")).toContain(shared.envId);
+  it("bumps the key version, gives the member old and new, keeps everyone else on the new one, clears the request", async () => {
+    expect(await applyRegrant(db, "alice", shared.orgId, "carol", good())).toEqual({ status: "granted", envIds: [shared.envId] });
+    expect((await db.select().from(schema.environment).where(eq(schema.environment.id, shared.envId)))[0].currentKeyVersion).toBe(2);
+    const versions = async (u: string) =>
+      (await db.select().from(schema.environmentKeyGrant).where(and(eq(schema.environmentKeyGrant.envId, shared.envId), eq(schema.environmentKeyGrant.principalId, u)))).map((g) => g.keyVersion).sort();
+    expect(await versions("carol")).toEqual([1, 2]);
+    expect(await versions("alice")).toEqual([1, 2]);
     expect(await db.select().from(schema.regrantRequest).where(eq(schema.regrantRequest.userId, "carol"))).toHaveLength(0);
     expect((await planRegrant(db, "alice", shared.orgId, "carol")).status).toBe("nothing");
   });
