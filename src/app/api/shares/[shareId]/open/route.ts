@@ -18,7 +18,7 @@ export async function POST(request: Request, { params }: Ctx) {
   if (!sameOrigin(request)) return json({ error: "Cross-origin request refused." }, 403);
   const { shareId } = await params;
   const tooMany =
-    (await limited(db, `share-open:${clientKey(request)}`, 30, 60_000)) ?? (await limited(db, `share-open-link:${shareId.toLowerCase()}`, 60, 60_000));
+    (await limited(db, clientKey(request) && `share-open:${clientKey(request)}`, 30, 60_000)) ?? (await limited(db, `share-open-link:${shareId.toLowerCase()}`, 60, 60_000));
   if (tooMany) return tooMany;
   const opened = UUID.test(shareId) ? await openShare(db, shareId.toLowerCase()) : null;
   if (!opened) return json({ error: "This link is not available. It may have expired, been used up, or been revoked." }, 404);

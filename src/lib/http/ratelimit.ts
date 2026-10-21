@@ -1,4 +1,4 @@
-import { and, lt, sql } from "drizzle-orm";
+import { lt, sql } from "drizzle-orm";
 import type { LibSQLDatabase } from "drizzle-orm/libsql";
 import * as schema from "../db/schema";
 
@@ -12,30 +12,38 @@ export type LimitResult = { ok: true } | { ok: false; retryAfterSeconds: number 
  */
 export async function hit(db: Db, key: string, limit: number, windowMs: number, now = Date.now()): Promise<LimitResult> {
   const window = Math.floor(now / windowMs);
+  const expiresAt = (window + 1) * windowMs;
   const [row] = await db
     .insert(schema.rateLimit)
-    .values({ key, window, count: 1 })
+    .values({ key, window, count: 1, expiresAt })
     .onConflictDoUpdate({ target: [schema.rateLimit.key, schema.rateLimit.window], set: { count: sql`${schema.rateLimit.count} + 1` } })
     .returning({ count: schema.rateLimit.count });
-  // Tidy old windows now and then; a failure here must never block a request.
+  // Tidy finished windows now and then. By absolute expiry, so a short window can never delete a long one that is still live.
   if (Math.random() < 0.01) {
-    await db.delete(schema.rateLimit).where(and(lt(schema.rateLimit.window, window - 1))).catch(() => null);
+    await db.delete(schema.rateLimit).where(lt(schema.rateLimit.expiresAt, now)).catch(() => null);
   }
   if (row.count <= limit) return { ok: true };
-  return { ok: false, retryAfterSeconds: Math.max(1, Math.ceil(((window + 1) * windowMs - now) / 1000)) };
+  return { ok: false, retryAfterSeconds: Math.max(1, Math.ceil((expiresAt - now) / 1000)) };
 }
 
-/** Where a request came from, as far as a proxy tells us. Only a defence in depth: the header can be forged. */
-export function clientKey(request: Request): string {
-  const fwd = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return fwd || request.headers.get("x-real-ip") || "unknown";
+/**
+ * The client address as added by our own reverse proxies, or null when it cannot be trusted. A client
+ * can put anything at the front of X-Forwarded-For, so we count `hops` entries in from the right (the
+ * ones our proxies appended). With hops set to 0 there is no trusted source, and per-address limits
+ * are skipped rather than lumping everyone into one shared bucket.
+ */
+export function clientKey(request: Request, hops = Number(process.env.TRUSTED_PROXY_HOPS ?? 1)): string | null {
+  if (!Number.isInteger(hops) || hops < 1) return null;
+  const parts = (request.headers.get("x-forwarded-for") ?? "").split(",").map((p) => p.trim()).filter(Boolean);
+  return parts.length >= hops ? parts[parts.length - hops] : request.headers.get("x-real-ip") || null;
 }
 
 export const tooMany = (retryAfterSeconds: number) =>
   Response.json({ error: "Too many attempts. Wait a moment and try again." }, { status: 429, headers: { "retry-after": String(retryAfterSeconds), "cache-control": "private, no-store" } });
 
-/** Returns a 429 response when the key is over its limit, otherwise null. */
-export async function limited(db: Db, key: string, limit: number, windowMs: number): Promise<Response | null> {
+/** Returns a 429 response when the key is over its limit, otherwise null. A null key means "nothing trustworthy to limit by". */
+export async function limited(db: Db, key: string | null, limit: number, windowMs: number): Promise<Response | null> {
+  if (!key) return null;
   const r = await hit(db, key, limit, windowMs);
   return r.ok ? null : tooMany(r.retryAfterSeconds);
 }

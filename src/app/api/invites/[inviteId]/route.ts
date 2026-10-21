@@ -14,7 +14,7 @@ export async function GET(request: Request, { params }: Ctx) {
   const who = await guard(request);
   if (who instanceof Response) return who;
   const session = await auth.api.getSession({ headers: request.headers });
-  const slow = await limited(db, `invite-open:${session?.user.id ?? clientKey(request)}`, 30, 60_000);
+  const slow = await limited(db, session ? `invite-open:${session.user.id}` : clientKey(request) && `invite-open-ip:${clientKey(request)}`, 30, 60_000);
   if (slow) return slow;
   const { inviteId } = await params;
   const offer = session ? await getInviteOffer(db, session.user, inviteId, parseToken(request.headers.get("x-invite-token"))) : null;

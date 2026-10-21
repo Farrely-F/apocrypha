@@ -1,0 +1,1 @@
+ALTER TABLE `rate_limit` ADD `expires_at` integer DEFAULT 0 NOT NULL;

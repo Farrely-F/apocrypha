@@ -37,8 +37,25 @@ describe("rate limit", () => {
     expect(results.filter((r) => r.ok)).toHaveLength(4);
   });
 
-  it("reads the client from the proxy header", () => {
-    expect(clientKey(new Request("http://x", { headers: { "x-forwarded-for": "1.2.3.4, 10.0.0.1" } }))).toBe("1.2.3.4");
-    expect(clientKey(new Request("http://x"))).toBe("unknown");
+  it("counts proxy hops from the right, so a forged first entry changes nothing", () => {
+    const req = (xff?: string) => new Request("http://x", { headers: xff ? { "x-forwarded-for": xff } : {} });
+    expect(clientKey(req("6.6.6.6, 1.2.3.4"), 1)).toBe("1.2.3.4"); // the client lied at the front; the proxy appended the real address
+    expect(clientKey(req("6.6.6.6, 1.2.3.4, 10.0.0.1"), 2)).toBe("1.2.3.4");
+    expect(clientKey(req(), 1)).toBeNull(); // no header: no shared "unknown" bucket
+    expect(clientKey(req("1.2.3.4"), 0)).toBeNull(); // no trusted proxy configured: ignore the header entirely
+  });
+
+  it("a short window never deletes a live long window", async () => {
+    const t = 4_000_000_000;
+    await hit(db, "hourly", 2, 3_600_000, t);
+    await hit(db, "hourly", 2, 3_600_000, t);
+    const spy = Math.random;
+    Math.random = () => 0; // force the cleanup branch on every call
+    try {
+      for (let i = 0; i < 3; i++) await hit(db, `minute-${i}`, 5, 60_000, t + 10_000);
+    } finally {
+      Math.random = spy;
+    }
+    expect((await hit(db, "hourly", 2, 3_600_000, t + 20_000)).ok).toBe(false); // the third hourly attempt is still counted
   });
 });

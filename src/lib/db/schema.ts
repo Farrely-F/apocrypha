@@ -381,6 +381,8 @@ export const rateLimit = sqliteTable(
     key: text("key").notNull(),
     window: integer("window").notNull(),
     count: integer("count").notNull().default(0),
+    // Absolute end of this window in ms. Cleanup goes by this, because windows of different sizes share the table.
+    expiresAt: integer("expires_at").notNull().default(0),
   },
   (table) => [primaryKey({ name: "rate_limit_pk", columns: [table.key, table.window] })],
 );
