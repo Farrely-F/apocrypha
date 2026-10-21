@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, ChevronsUpDown, Pencil, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronsUpDown, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -31,6 +31,7 @@ import {
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useVault } from "@/components/vault/vault-provider";
+import { InviteDialog } from "@/components/workspace/invite-dialog";
 import { CommandPalette } from "@/components/workspace/command-palette";
 import { generateEnvironmentKey, wrapEnvironmentKey } from "@/lib/crypto";
 import {
@@ -68,6 +69,7 @@ const trigger = (children: React.ReactNode) => (
  */
 export function WorkspaceNav({ tree }: { tree: TreeOrg[] }) {
   const [newOrg, setNewOrg] = useState(false);
+  const [invite, setInvite] = useState(false);
   const pathname = usePathname();
   const where = parse(pathname);
   const org = tree.find((o) => o.id === where?.orgId) ?? null;
@@ -108,9 +110,15 @@ export function WorkspaceNav({ tree }: { tree: TreeOrg[] }) {
           <DropdownMenuItem onClick={() => setNewOrg(true)}>
             <Plus /> New organisation
           </DropdownMenuItem>
+          {canBuild && (
+            <DropdownMenuItem onClick={() => setInvite(true)}>
+              <UserPlus /> Invite to {org.name}
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
       <NewOrganizationDialog open={newOrg} onOpenChange={setNewOrg} />
+      {canBuild && <InviteDialog org={org} open={invite} onOpenChange={setInvite} />}
       <span aria-hidden className="hidden text-bone-faint sm:inline">/</span>
 
       <DropdownMenu>
