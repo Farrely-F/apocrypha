@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth/auth";
 import { db } from "@/lib/db/client";
+import { clientKey, limited } from "@/lib/http/ratelimit";
 import { audit } from "@/lib/audit/store";
 import { orgOfInvite } from "@/lib/audit/lookup";
 import { parseToken } from "@/lib/invites/payload";
@@ -13,6 +14,8 @@ export async function GET(request: Request, { params }: Ctx) {
   const who = await guard(request);
   if (who instanceof Response) return who;
   const session = await auth.api.getSession({ headers: request.headers });
+  const slow = await limited(db, `invite-open:${session?.user.id ?? clientKey(request)}`, 30, 60_000);
+  if (slow) return slow;
   const { inviteId } = await params;
   const offer = session ? await getInviteOffer(db, session.user, inviteId, parseToken(request.headers.get("x-invite-token"))) : null;
   return offer ? json(offer) : json({ error: "This invite is not valid." }, 404);

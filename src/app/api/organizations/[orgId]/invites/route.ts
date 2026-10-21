@@ -1,4 +1,5 @@
 import { db } from "@/lib/db/client";
+import { limited } from "@/lib/http/ratelimit";
 import { audit } from "@/lib/audit/store";
 import { readJsonLimited } from "@/lib/http/body";
 import { parseNewInvite } from "@/lib/invites/payload";
@@ -18,6 +19,8 @@ export async function GET(request: Request, { params }: Ctx) {
 export async function POST(request: Request, { params }: Ctx) {
   const who = await guard(request);
   if (who instanceof Response) return who;
+  const slow = await limited(db, `invite-create:${who.userId}`, 30, 3_600_000);
+  if (slow) return slow;
   const read = await readJsonLimited(request, 64_000);
   if (!read.ok) return json({ error: read.error }, read.status);
   const parsed = parseNewInvite(read.value);

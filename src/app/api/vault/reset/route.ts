@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth/auth";
 import { REAUTH_MESSAGE, signedInRecently } from "@/lib/auth/fresh";
 import { db } from "@/lib/db/client";
+import { limited } from "@/lib/http/ratelimit";
 import { auditAccount } from "@/lib/audit/lookup";
 import { readJsonLimited } from "@/lib/http/body";
 import { sameOrigin } from "@/lib/http/origin";
@@ -27,6 +28,8 @@ export async function POST(request: Request) {
   if (!sameOrigin(request)) return json({ error: "Cross-origin request refused." }, 403);
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) return json({ error: "Sign in first." }, 401);
+  const slow = await limited(db, `reset:${session.user.id}`, 5, 3_600_000);
+  if (slow) return slow;
   if (!signedInRecently(session.session)) return json({ error: REAUTH_MESSAGE.replace("Changing the passphrase needs", "Resetting needs"), code: "reauth" }, 403);
 
   const read = await readJsonLimited(request, 64_000);

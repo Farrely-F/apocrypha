@@ -1,4 +1,5 @@
 import { db } from "@/lib/db/client";
+import { limited } from "@/lib/http/ratelimit";
 import { audit } from "@/lib/audit/store";
 import { orgOfEnv } from "@/lib/audit/lookup";
 import { readJsonLimited } from "@/lib/http/body";
@@ -12,6 +13,8 @@ type Ctx = { params: Promise<{ envId: string }> };
 export async function POST(request: Request, { params }: Ctx) {
   const who = await guard(request);
   if (who instanceof Response) return who;
+  const slow = await limited(db, `share-create:${who.userId}`, 60, 3_600_000);
+  if (slow) return slow;
   const read = await readJsonLimited(request, MAX_ENVELOPE + 2_000);
   if (!read.ok) return json({ error: read.error }, read.status);
   const parsed = parseNewShare(read.value);

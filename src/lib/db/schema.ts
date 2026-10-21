@@ -373,3 +373,14 @@ export const auditEnvRead = sqliteTable(
   },
   (table) => [primaryKey({ name: "audit_env_read_pk", columns: [table.sessionId, table.envId] })],
 );
+
+// Fixed-window counters for the endpoints that could be abused (see src/lib/http/ratelimit.ts).
+export const rateLimit = sqliteTable(
+  "rate_limit",
+  {
+    key: text("key").notNull(),
+    window: integer("window").notNull(),
+    count: integer("count").notNull().default(0),
+  },
+  (table) => [primaryKey({ name: "rate_limit_pk", columns: [table.key, table.window] })],
+);

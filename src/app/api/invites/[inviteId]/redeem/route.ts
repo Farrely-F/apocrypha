@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth/auth";
 import { db } from "@/lib/db/client";
+import { limited } from "@/lib/http/ratelimit";
 import { audit } from "@/lib/audit/store";
 import { readJsonLimited } from "@/lib/http/body";
 import { parseRedeem, parseToken } from "@/lib/invites/payload";
@@ -14,6 +15,8 @@ export async function POST(request: Request, { params }: Ctx) {
   if (who instanceof Response) return who;
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) return json({ error: "Sign in first." }, 401);
+  const slow = await limited(db, `invite-redeem:${session.user.id}`, 20, 60_000);
+  if (slow) return slow;
   const vault = await getVaultRecord(db, session.user.id);
   if (!vault) return json({ error: "Create your vault first." }, 409);
   const read = await readJsonLimited(request, 64_000);
