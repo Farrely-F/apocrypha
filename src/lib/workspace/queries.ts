@@ -20,6 +20,7 @@ export async function insertPersonalWorkspace(
   tx: Executor,
   userId: string,
   ws: WorkspacePayload,
+  slugPrefix = "personal",
 ): Promise<WorkspaceIds> {
   const orgId = crypto.randomUUID();
   const projectId = crypto.randomUUID();
@@ -30,7 +31,7 @@ export async function insertPersonalWorkspace(
     name: ws.orgName,
     // Better Auth's organization plugin requires a unique slug.
     // Full id: a short prefix could collide and roll the whole vault creation back.
-    slug: `personal-${orgId}`,
+    slug: `${slugPrefix}-${orgId}`,
   });
   await tx
     .insert(schema.member)

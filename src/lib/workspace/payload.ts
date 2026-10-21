@@ -37,3 +37,19 @@ export function parseNewProject(input: unknown, alg: Alg): Parsed<NewProjectBody
   if (!environment.ok) return environment;
   return { ok: true, value: { orgId: o.orgId.toLowerCase(), name: name.value, environment: environment.value } };
 }
+
+export type NewOrganizationBody = { name: string; projectName: string; environment: NewEnvironmentBody };
+
+export function parseNewOrganization(input: unknown, alg: Alg): Parsed<NewOrganizationBody> {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) return fail("Request body must be a JSON object.");
+  const o = input as Record<string, unknown>;
+  const extra = onlyKeys(o, ["name", "projectName", "environment"]);
+  if (extra) return fail(extra);
+  const name = parseName(o.name, "name");
+  if (!name.ok) return name;
+  const projectName = parseName(o.projectName, "projectName");
+  if (!projectName.ok) return projectName;
+  const environment = parseNewEnvironment(o.environment, alg);
+  if (!environment.ok) return environment;
+  return { ok: true, value: { name: name.value, projectName: projectName.value, environment: environment.value } };
+}

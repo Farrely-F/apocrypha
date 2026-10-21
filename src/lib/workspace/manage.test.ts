@@ -8,7 +8,7 @@ import { migrate } from "drizzle-orm/libsql/migrator";
 import { beforeAll, describe, expect, it } from "vitest";
 import * as schema from "../db/schema";
 import { createVaultRecord } from "../vault/store";
-import { createEnvironment, createProject, deleteEnvironment, deleteProject, listWorkspaceTree, renameEnvironment, renameProject } from "./manage";
+import { createEnvironment, createOrganization, createProject, deleteEnvironment, deleteProject, listWorkspaceTree, renameEnvironment, renameProject } from "./manage";
 import type { WorkspaceIds } from "./shared";
 
 let db: ReturnType<typeof drizzle<typeof schema>>;
@@ -105,5 +105,24 @@ describe("rename and delete", () => {
     expect((await deleteProject(db, "dave", p.projectId)).status).toBe("forbidden");
     expect((await deleteProject(db, "alice", p.projectId)).status).toBe("ok");
     expect(await db.select().from(schema.environment).where(eq(schema.environment.id, solo.id))).toHaveLength(0);
+  });
+});
+
+describe("organisations", () => {
+  it("creates an org owned by the caller with its first environment and grant", async () => {
+    const e = env("dev");
+    const r = await createOrganization(db, "bob", { name: "Acme", projectName: "Web", environment: e });
+    if (r.status !== "created") throw new Error("create");
+    const tree = await listWorkspaceTree(db, "bob");
+    expect(tree).toHaveLength(1);
+    expect(tree[0]).toMatchObject({ name: "Acme", role: "owner" });
+    expect(tree[0].projects[0].environments[0].id).toBe(e.id);
+    // a second org does not touch the first, and ids are unique
+    const r2 = await createOrganization(db, "bob", { name: "Acme", projectName: "Web", environment: env("dev") });
+    expect(r2.status).toBe("created");
+    expect(await listWorkspaceTree(db, "bob")).toHaveLength(2);
+    expect((await createOrganization(db, "bob", { name: "X", projectName: "Y", environment: e })).status).toBe("env-exists");
+    // alice sees none of it
+    expect((await listWorkspaceTree(db, "alice")).map((o) => o.name)).not.toContain("Acme");
   });
 });

@@ -35,9 +35,11 @@ import { CommandPalette } from "@/components/workspace/command-palette";
 import { generateEnvironmentKey, wrapEnvironmentKey } from "@/lib/crypto";
 import {
   newEnvironmentSchema,
+  newOrganizationSchema,
   newProjectSchema,
   renameSchema,
   type NewEnvironmentValues,
+  type NewOrganizationValues,
   type NewProjectValues,
   type RenameValues,
 } from "@/lib/workspace/schemas";
@@ -65,6 +67,7 @@ const trigger = (children: React.ReactNode) => (
  * to make new ones. The tree only lists environments you hold a key for.
  */
 export function WorkspaceNav({ tree }: { tree: TreeOrg[] }) {
+  const [newOrg, setNewOrg] = useState(false);
   const pathname = usePathname();
   const where = parse(pathname);
   const org = tree.find((o) => o.id === where?.orgId) ?? null;
@@ -79,9 +82,35 @@ export function WorkspaceNav({ tree }: { tree: TreeOrg[] }) {
 
   return (
     <div className="flex min-w-0 items-center gap-1 text-sm" aria-label="Location" role="navigation">
-      <span className="hidden truncate px-2 text-bone-faint sm:inline" title="Organisation">
-        {org.name}
-      </span>
+      <DropdownMenu>
+        <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="hidden max-w-40 text-bone-faint sm:inline-flex" aria-label="Switch organisation" />}>
+          {trigger(org.name)}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="min-w-56">
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Organisations</DropdownMenuLabel>
+            {tree.map((o) => {
+              const first = o.projects[0]?.environments[0];
+              return (
+                <DropdownMenuItem
+                  key={o.id}
+                  disabled={!first}
+                  render={first ? <Link href={environmentPath({ orgId: o.id, projectId: o.projects[0].id, envId: first.id })} /> : undefined}
+                >
+                  {o.id === org.id ? <Check /> : <span className="size-4" />}
+                  <span className="truncate">{o.name}</span>
+                  <span className="ml-auto text-xs text-bone-faint">{o.role}</span>
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setNewOrg(true)}>
+            <Plus /> New organisation
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <NewOrganizationDialog open={newOrg} onOpenChange={setNewOrg} />
       <span aria-hidden className="hidden text-bone-faint sm:inline">/</span>
 
       <DropdownMenu>
@@ -475,6 +504,78 @@ function ManageDialog({
             </Button>
             <Button type="submit" disabled={form.formState.isSubmitting}>
               Rename
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function NewOrganizationDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+  const router = useRouter();
+  const { keyPair } = useVault();
+  const form = useForm<NewOrganizationValues>({
+    resolver: zodResolver(newOrganizationSchema),
+    defaultValues: { organization: "", project: "First project", environment: "dev" },
+  });
+
+  async function onSubmit(values: NewOrganizationValues) {
+    if (!keyPair) return form.setError("root.server", { message: "Unlock your vault first." });
+    try {
+      const environment = await sealNewEnvironment(keyPair.publicKey, values.environment);
+      const made = await post("/api/organizations", { name: values.organization, projectName: values.project, environment });
+      onOpenChange(false);
+      form.reset();
+      router.push(environmentPath(made));
+      router.refresh();
+    } catch (e) {
+      form.setError("root.server", { message: (e as Error).message });
+    }
+  }
+
+  const fields = [
+    { name: "organization", label: "Organisation name", description: "A team or company. You become its owner." },
+    { name: "project", label: "First project", description: undefined },
+    { name: "environment", label: "First environment", description: "Its key is created in this browser." },
+  ] as const;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>New organisation</DialogTitle>
+          <DialogDescription>Organisations keep projects and, soon, teammates apart.</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={form.handleSubmit(onSubmit)} noValidate aria-label="New organisation" className="grid gap-4">
+          <FieldGroup>
+            {fields.map((f, i) => (
+              <Controller
+                key={f.name}
+                name={f.name}
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor={`org-${f.name}`}>{f.label}</FieldLabel>
+                    <Input {...field} id={`org-${f.name}`} autoFocus={i === 0} autoComplete="off" aria-invalid={fieldState.invalid} />
+                    {f.description && <FieldDescription>{f.description}</FieldDescription>}
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+            ))}
+          </FieldGroup>
+          {form.formState.errors.root?.server && (
+            <Alert variant="destructive">
+              <AlertDescription>{form.formState.errors.root.server.message}</AlertDescription>
+            </Alert>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={form.formState.isSubmitting}>
+              Create organisation
             </Button>
           </DialogFooter>
         </form>

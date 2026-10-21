@@ -2,6 +2,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import type { LibSQLDatabase } from "drizzle-orm/libsql";
 import * as schema from "../db/schema";
 import type { OrgRole } from "../db/schema";
+import { insertPersonalWorkspace } from "./queries";
 import { FIRST_KEY_VERSION } from "./shared";
 
 type Db = LibSQLDatabase<typeof schema>;
@@ -219,4 +220,29 @@ export async function deleteEnvironment(db: Db, userId: string, envId: string): 
   if (siblings.length < 2) return { status: "last-environment" };
   await db.delete(schema.environment).where(eq(schema.environment.id, envId));
   return { status: "ok" };
+}
+
+/** A new organisation with the caller as owner, plus its first project and environment. */
+export async function createOrganization(
+  db: Db,
+  userId: string,
+  input: { name: string; projectName: string; environment: NewEnvironment },
+): Promise<{ status: "created"; orgId: string; projectId: string; envId: string } | { status: "env-exists" }> {
+  const [clash] = await db.select({ id: schema.environment.id }).from(schema.environment).where(eq(schema.environment.id, input.environment.id)).limit(1);
+  if (clash) return { status: "env-exists" };
+  const ids = await db.transaction((tx) =>
+    insertPersonalWorkspace(
+      tx,
+      userId,
+      {
+        envId: input.environment.id,
+        wrappedKey: input.environment.wrappedKey,
+        orgName: input.name,
+        projectName: input.projectName,
+        environmentName: input.environment.name,
+      },
+      "org",
+    ),
+  );
+  return { status: "created", ...ids };
 }
