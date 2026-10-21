@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // react-bits vendor effects; ref access during render is upstream code.
+    "src/components/Dither.jsx",
+    "src/components/FaultyTerminal.jsx",
+    "src/components/GradientASCII.jsx",
+    ".claude/**",
   ]),
 ]);
 

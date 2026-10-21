@@ -49,3 +49,7 @@ next-env.d.ts
 
 # allow example env
 !.env.example
+
+# local tooling
+/.claude/worktrees/
+.vitest/
