@@ -4,9 +4,20 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pane } from "@/components/shell";
 import { Button } from "@/components/ui/button";
-import { createVault, type CreatedVault } from "@/lib/crypto";
+import {
+  createVault,
+  generateEnvironmentKey,
+  wrapEnvironmentKey,
+  type CreatedVault,
+} from "@/lib/crypto";
 import { setUnlockedKeyPair } from "@/lib/vault/unlocked";
 import { passphraseStrength, type StrengthLevel } from "@/lib/vault/strength";
+import {
+  DEFAULT_WORKSPACE_NAMES,
+  FIRST_KEY_VERSION,
+  environmentPath,
+  type WorkspaceIds,
+} from "@/lib/workspace/shared";
 
 const field =
   "w-full border border-hairline bg-pane px-3 py-2 text-bone placeholder:text-bone-faint focus:border-signal focus:outline-none";
@@ -88,6 +99,20 @@ export function CreateVaultForm({ email }: { email: string }) {
     setError(null);
     setStep("saving");
     try {
+      // The first environment's key is made here and only ever leaves this
+      // browser wrapped to the user's own public key. The wrap binds the env id
+      // and key version, so the id is chosen now rather than by the server.
+      const envKey = generateEnvironmentKey();
+      const envId = crypto.randomUUID();
+      let wrappedKey: string;
+      try {
+        wrappedKey = await wrapEnvironmentKey(envKey, vault.keyPair.publicKey, {
+          envId,
+          keyVersion: FIRST_KEY_VERSION,
+        });
+      } finally {
+        envKey.fill(0);
+      }
       const res = await fetch("/api/vault", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -95,6 +120,7 @@ export function CreateVaultForm({ email }: { email: string }) {
           publicKey: vault.keyPair.publicKey,
           passphraseBlob: vault.passphraseBlob,
           recoveryBlob: vault.recoveryBlob,
+          workspace: { envId, wrappedKey, ...DEFAULT_WORKSPACE_NAMES },
         }),
       });
       if (res.status === 409) {
@@ -108,8 +134,15 @@ export function CreateVaultForm({ email }: { email: string }) {
         setStep("recovery");
         return;
       }
+      const ids = (await res.json().catch(() => null)) as Partial<WorkspaceIds> | null;
       setUnlockedKeyPair(vault.keyPair);
-      router.replace("/dashboard");
+      // The vault is saved. Land in the new environment; /dashboard resolves
+      // to the same place if the response was unreadable.
+      router.replace(
+        ids?.orgId && ids.projectId && ids.envId
+          ? environmentPath({ orgId: ids.orgId, projectId: ids.projectId, envId: ids.envId })
+          : "/dashboard",
+      );
     } catch {
       setError("Could not reach the server. Check your connection and try again.");
       setStep("recovery");
