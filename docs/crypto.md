@@ -120,7 +120,7 @@ Vectors are asserted in `src/lib/crypto/kat.test.ts` against (a) an independent 
 - X25519: RFC 7748 section 6.1 (Alice sk `77076d0a...2c2a`, Bob pk `de9edb7d...2b4f` -> `4a5d9d5ba4ce2de1728e3bf480350f25e07e21c947d19e3376f09b3c1e161742`).
 - HKDF-SHA-256: RFC 5869 test case 1.
 - AES-256-GCM: GCM specification test case 16 (with AAD).
-- Argon2: the reference README vector (`password`, salt `somesalt`, t=2, m=65536, p=4, 24 bytes) via `argon2i`. `hash-wasm` exposes no associated-data input, so the RFC 9106 Argon2id vector cannot be run; Argon2id correctness is delegated to `hash-wasm` (see section 8).
+- Argon2id: phc-winner-argon2 reference vector, v0x13, password `password`, salt `somesalt`, t=2, m=65536 KiB, p=1, 32 bytes -> `09316115d5cf24ed5a15a31a3ba326e5cf32edc24702987c02b6566f61913cf7`. Also the README Argon2i vector (t=2, m=65536, p=4, 24 bytes). `hash-wasm` exposes no associated-data input, so the RFC 9106 section 5.3 vector (which uses AD and a secret) is not run.
 
 ### 7.2 Protocol vectors
 
@@ -167,7 +167,7 @@ The P-256 wrap is cross-checked against the `node:crypto` reference with random 
 ## 9. Not covered / known limits
 
 - **Unaudited**, and not verified in real browsers (tests run on Node's `webcrypto`; X25519 availability varies by browser, hence the P-256 fallback).
-- Argon2id is only as correct as `hash-wasm`. No independent Argon2id vector is checked in.
+- Argon2id is only as correct as `hash-wasm`. One reference vector (single lane, no AD) is checked; multi-lane Argon2id and the RFC 9106 AD/secret path are not.
 - JavaScript cannot guarantee zeroisation; buffers are wiped best-effort.
 - The server delivers the code that runs this module (DESIGN.md section 2).
 - No forward secrecy for grants beyond the ephemeral sender key: compromise of a recipient's long-term private key exposes every grant ever wrapped to it.

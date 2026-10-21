@@ -9,7 +9,7 @@
  * changes, the wire format changed: bump the blob version instead.
  */
 import * as nodeCrypto from "node:crypto";
-import { argon2i } from "hash-wasm";
+import { argon2i, argon2id } from "hash-wasm";
 import { describe, expect, it } from "vitest";
 import { b64u, fromHex, lp, toHex, utf8 } from "./encoding";
 import {
@@ -86,6 +86,19 @@ describe("primitive known answers", () => {
       "522dc1f099567d07f47f37a32a84427d643a8cdcbfe5c0c97598a2bd2555d1aa8cb08e48590dbb3da7b08b1056828838c5f61e6393ba7a0abcc9f662" +
         "76fc6ece0f4e1768cddf8853bb2d551b",
     );
+  });
+
+  it("Argon2id matches the phc-winner-argon2 reference vector (v0x13, t=2, m=64MiB, p=1)", async () => {
+    const out = await argon2id({
+      password: "password",
+      salt: "somesalt",
+      iterations: 2,
+      memorySize: 65536,
+      parallelism: 1,
+      hashLength: 32,
+      outputType: "hex",
+    });
+    expect(out).toBe("09316115d5cf24ed5a15a31a3ba326e5cf32edc24702987c02b6566f61913cf7");
   });
 
   it("Argon2 engine matches the reference README vector (argon2i, t=2, m=64MiB, p=4)", async () => {
