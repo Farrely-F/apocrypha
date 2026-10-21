@@ -77,9 +77,9 @@ export function DesignChapter({ steps }: { steps: readonly DesignStep[] }) {
     <section
       id="design"
       aria-labelledby="design-title"
-      className="relative mx-auto w-full max-w-[96rem] scroll-mt-12 px-6 py-24 sm:px-10"
+      className="relative scroll-mt-14"
     >
-      <div className="grid gap-10 lg:grid-cols-[minmax(0,28rem)_minmax(0,1fr)] lg:gap-16">
+      <div className="mx-auto grid w-full max-w-[96rem] gap-10 px-6 py-24 sm:px-10 lg:grid-cols-[minmax(0,28rem)_minmax(0,1fr)] lg:gap-16">
         <div className="relative">
           <h2 id="design-title" className="font-display text-4xl text-bone">
             The design
@@ -132,7 +132,7 @@ export function DesignChapter({ steps }: { steps: readonly DesignStep[] }) {
             <Pane
               title={steps[active].pane}
               meta={`${active + 1} of ${steps.length}`}
-              className="mora-frame-corners min-h-[19rem]"
+              className="min-h-[19rem]"
             >
               <div key={active} className="mora-flicker">
                 <Visual i={active} t={t} />

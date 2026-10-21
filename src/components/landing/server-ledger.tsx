@@ -71,9 +71,9 @@ export function ServerLedger({ rows }: { rows: readonly LedgerRow[] }) {
       ref={ref}
       id="holds"
       aria-labelledby="holds-title"
-      className="relative scroll-mt-12 motion-safe:h-[320svh] motion-reduce:h-auto"
+      className="relative scroll-mt-14 motion-safe:h-[320svh] motion-reduce:h-auto"
     >
-      <div className="mx-auto flex w-full max-w-[96rem] flex-col justify-center gap-8 px-6 py-16 sm:px-10 motion-safe:sticky motion-safe:top-12 motion-safe:min-h-[calc(100svh-3rem)] motion-safe:py-10">
+      <div className="mx-auto flex w-full max-w-[96rem] flex-col justify-center gap-8 px-6 py-16 sm:px-10 motion-safe:sticky motion-safe:top-14 motion-safe:min-h-[calc(100svh-3.5rem)] motion-safe:py-10">
         <div>
           <p className="max-w-[62ch] text-bone-dim">
             The same three secrets, as you see them and as we store them. Names

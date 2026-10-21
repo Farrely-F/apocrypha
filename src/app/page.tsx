@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { preload } from "react-dom";
 import { Divider } from "@/components/shell";
 import { LandingHeader } from "@/components/landing/landing-header";
+import { PageGround } from "@/components/landing/page-ground";
+import { LandingFooter } from "@/components/landing/landing-footer";
 import { Hero } from "@/components/landing/hero";
 import { ServerLedger } from "@/components/landing/server-ledger";
 import { DesignChapter } from "@/components/landing/design-chapter";
@@ -104,7 +106,8 @@ export default function Landing() {
   preload("/brand/hero-library.webp", { as: "image", type: "image/webp" });
 
   return (
-    <>
+    <div className="relative isolate">
+      <PageGround />
       <script
         type="application/ld+json"
         // Static, authored JSON. Never interpolate user input here.
@@ -112,7 +115,7 @@ export default function Landing() {
       />
       <LandingHeader repo={REPO} />
 
-      <main className="flex-1">
+      <main className="relative z-10 flex-1">
         <Hero repo={REPO} />
 
         <ServerLedger rows={ledger} />
@@ -142,27 +145,7 @@ export default function Landing() {
         <Unlock repo={REPO} />
       </main>
 
-      <footer className="relative isolate overflow-hidden border-t border-hairline">
-        <div
-          aria-hidden
-          className="mora-tex-stacks-painted absolute inset-0 z-0 opacity-80 [mask-image:linear-gradient(to_bottom,transparent,#000_70%)]"
-        />
-        <div
-          aria-hidden
-          className="absolute inset-0 z-[1] bg-gradient-to-b from-background/30 via-background/65 to-background"
-        />
-        <div
-          className={`${wrap} relative z-10 flex flex-col justify-end gap-2 pt-24 pb-6 text-xs text-bone-faint`}
-        >
-          <span>Open source. Unaudited.</span>
-          <a
-            href={REPO}
-            className="w-fit text-bone-dim underline underline-offset-4 hover:text-signal"
-          >
-            github.com/Farrely-F/apocrypha
-          </a>
-        </div>
-      </footer>
-    </>
+      <LandingFooter repo={REPO} />
+    </div>
   );
 }

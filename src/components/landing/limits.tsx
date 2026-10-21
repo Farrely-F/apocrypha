@@ -13,8 +13,9 @@ export function Limits({ limits }: { limits: readonly Limit[] }) {
     <section
       id="limits"
       aria-labelledby="limits-title"
-      className="mx-auto w-full max-w-[96rem] scroll-mt-12 px-6 py-24 sm:px-10"
+      className="relative scroll-mt-14"
     >
+      <div className="mx-auto w-full max-w-[96rem] px-6 py-28 sm:px-10">
       <Pane
         title={<span id="limits-title">Limits, up front</span>}
         meta={<span className="hidden sm:inline">read before you trust it</span>}
@@ -26,6 +27,7 @@ export function Limits({ limits }: { limits: readonly Limit[] }) {
           ))}
         </ul>
       </Pane>
+      </div>
     </section>
   );
 }
