@@ -30,6 +30,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // A self-contained server (.next/standalone) so the Docker image does not need the whole node_modules.
+  output: "standalone",
   headers: async () => [{ source: "/:path*", headers: securityHeaders }],
   cacheComponents: true,
   partialPrefetching: true,

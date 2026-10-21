@@ -38,11 +38,20 @@ For local testing without GitHub, set `APOCRYPHA_TEST_AUTH=1` (ignored in produc
 
 ## What works today
 
-Personal workspace, projects and environments, add / edit / delete / import / export secrets, version history with diff and restore, bulk actions.
+- **Secrets:** personal workspace, projects and environments, add / edit / delete / import / export, version history with diff and restore, bulk actions, a Ctrl+K command palette.
+- **Teams:** organisations with owner / admin / member roles, invite links (single use, 48 h, optionally tied to one email), a members list with key fingerprints, and removing someone rotates every environment key they could open.
+- **Share links:** give someone without an account a snapshot of an environment through a link, optionally with a password, that expires by date and/or number of views and can be revoked.
+- **Recovery:** unlock with the recovery key, change the passphrase, or reset to a new key pair (an admin then re-shares what can be restored, rotating keys as they do).
+- **Audit log:** a per-organisation hash chain you can verify and export.
+- **Hardening:** CSP and security headers, rate limits on guest and recovery endpoints, sign-in freshness for destructive account actions.
+
+## Self-hosting
+
+A Docker image with migrations on boot, a health check and an online backup command: see [`docs/SELF-HOSTING.md`](docs/SELF-HOSTING.md).
 
 ## Not built yet
 
-Organizations and member roles, invites, share links, audit log, member removal with key rotation, recovery flow UI, CLI. Tracked in the GitHub issues.
+Google sign-in, magic links and email (SMTP), per-environment read/write grants and the read-to-none downgrade, a full re-encrypt job after rotation, a CLI, browser end-to-end tests, and CSP nonces. Tracked in the GitHub issues.
 
 ## Security headers
 
