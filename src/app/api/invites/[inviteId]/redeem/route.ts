@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth/auth";
 import { db } from "@/lib/db/client";
+import { audit } from "@/lib/audit/store";
 import { readJsonLimited } from "@/lib/http/body";
 import { parseRedeem, parseToken } from "@/lib/invites/payload";
 import { redeemInvite } from "@/lib/invites/store";
@@ -23,6 +24,7 @@ export async function POST(request: Request, { params }: Ctx) {
   const r = await redeemInvite(db, session.user, inviteId, parseToken(request.headers.get("x-invite-token")), parsed.value);
   switch (r.status) {
     case "joined":
+      await audit(db, { orgId: r.orgId, actorId: session.user.id, targetUserId: session.user.id, type: "member.joined", data: { inviteId } });
       return json({ orgId: r.orgId });
     case "already-member":
       return json({ error: "You are already in this organisation." }, 409);

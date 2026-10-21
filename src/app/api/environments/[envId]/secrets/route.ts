@@ -1,5 +1,8 @@
 import { auth } from "@/lib/auth/auth";
 import { db } from "@/lib/db/client";
+import { audit } from "@/lib/audit/store";
+import { orgOfEnv, orgOfProject } from "@/lib/audit/lookup";
+import { noteEnvRead } from "@/lib/audit/store";
 import { readJsonLimited } from "@/lib/http/body";
 import { sameOrigin } from "@/lib/http/origin";
 import { parseCreateSecret } from "@/lib/secrets/payload";
@@ -18,6 +21,11 @@ export async function GET(request: Request, { params }: Ctx) {
   const { envId } = await params;
   const secrets = isUuid(envId) ? await listSecrets(db, session.user.id, envId) : null;
   if (!secrets) return json({ error: "Not found." }, 404);
+  // reading an environment is logged once per session, not on every refresh
+  if (await noteEnvRead(db, session.session.id, envId)) {
+    const orgId = await orgOfEnv(db, envId);
+    if (orgId) await audit(db, { orgId, actorId: session.user.id, type: "env.read", envId });
+  }
   return json({ secrets });
 }
 
@@ -40,8 +48,11 @@ export async function POST(request: Request, { params }: Ctx) {
 
   const result = await createSecret(db, session.user.id, envId, parsed.value);
   switch (result.status) {
-    case "created":
+    case "created": {
+      const orgId = await orgOfEnv(db, envId);
+      if (orgId) await audit(db, { orgId, actorId: session.user.id, type: "secret.created", envId, data: { secretId: result.id } });
       return json({ id: result.id, version: result.version }, 201);
+    }
     case "forbidden":
       return json({ error: "Your role can read this environment but not add secrets." }, 403);
     case "stale-key":

@@ -1,6 +1,8 @@
 import { auth } from "@/lib/auth/auth";
 import { REAUTH_MESSAGE, signedInRecently } from "@/lib/auth/fresh";
 import { db } from "@/lib/db/client";
+import { audit } from "@/lib/audit/store";
+import { auditAccount } from "@/lib/audit/lookup";
 import { readJsonLimited } from "@/lib/http/body";
 import { sameOrigin } from "@/lib/http/origin";
 import { parseVaultPayload } from "@/lib/vault/payload";
@@ -37,6 +39,7 @@ export async function POST(request: Request) {
   if (result.status !== "reset") {
     return result.status === "no-vault" ? json({ error: "No vault for this account." }, 404) : json({ error: "That environment already exists. Try again." }, 409);
   }
+  await auditAccount(db, session.user.id, "member.vault_reset", { lost: result.impact.lost.length, recoverable: result.impact.recoverable.length });
   const { orgId, projectId, envId, impact } = result;
   return json({ ok: true, orgId, projectId, envId, lost: impact.lost.length, recoverable: impact.recoverable.length }, 200);
 }

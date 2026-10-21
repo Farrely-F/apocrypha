@@ -1,6 +1,8 @@
 import { auth } from "@/lib/auth/auth";
 import { REAUTH_MESSAGE, signedInRecently } from "@/lib/auth/fresh";
 import { db } from "@/lib/db/client";
+import { audit } from "@/lib/audit/store";
+import { auditAccount } from "@/lib/audit/lookup";
 import { readJsonLimited } from "@/lib/http/body";
 import { sameOrigin } from "@/lib/http/origin";
 import { checkPassphraseBlob, type Alg } from "@/lib/vault/payload";
@@ -31,5 +33,6 @@ export async function PUT(request: Request) {
   if (bad) return json({ error: bad }, 400);
 
   const ok = await replacePassphraseBlob(db, session.user.id, o.previousBlob, o.passphraseBlob);
+  if (ok) await auditAccount(db, session.user.id, "account.passphrase_changed");
   return ok ? json({ ok: true }, 200) : json({ error: "Your passphrase changed somewhere else. Reload and try again." }, 409);
 }

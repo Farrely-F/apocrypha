@@ -1,4 +1,5 @@
 import { db } from "@/lib/db/client";
+import { audit } from "@/lib/audit/store";
 import { readJsonLimited } from "@/lib/http/body";
 import { changeRole, removeMember, type Rotation } from "@/lib/members/store";
 import { UUID } from "@/lib/vault/payload";
@@ -14,7 +15,10 @@ export async function PATCH(request: Request, { params }: Ctx) {
   const o = read.value as { role?: unknown } | null;
   const { orgId, userId } = await params;
   const r = await changeRole(db, who.userId, orgId, userId, typeof o?.role === "string" ? o.role : "");
-  if (r === "ok") return json({ ok: true });
+  if (r === "ok") {
+    await audit(db, { orgId, actorId: who.userId, type: "member.role_changed", targetUserId: userId, data: { role: String(o?.role) } });
+    return json({ ok: true });
+  }
   if (r === "bad-role") return json({ error: "Role must be admin or member." }, 400);
   return r === "forbidden" ? json({ error: "Only an owner can change roles." }, 403) : json({ error: "Not found." }, 404);
 }
@@ -49,6 +53,8 @@ export async function DELETE(request: Request, { params }: Ctx) {
   const r = await removeMember(db, who.userId, orgId, userId, rotations);
   switch (r.status) {
     case "removed":
+      await audit(db, { orgId, actorId: who.userId, type: "member.removed", targetUserId: userId, data: { rotatedEnvironments: r.rotated.length } });
+      for (const x of r.rotated) await audit(db, { orgId, actorId: who.userId, type: "env.rotated", envId: x.envId, targetUserId: userId, data: { keyVersion: x.keyVersion } });
       return json({ rotated: r.rotated });
     case "not-found":
       return json({ error: "Not found." }, 404);

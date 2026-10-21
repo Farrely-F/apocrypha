@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth/auth";
 import { db } from "@/lib/db/client";
+import { audit } from "@/lib/audit/store";
 import { readJsonLimited } from "@/lib/http/body";
 import { sameOrigin } from "@/lib/http/origin";
 import { getVaultRecord } from "@/lib/vault/store";
@@ -28,6 +29,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
   const r = await createEnvironment(db, session.user.id, projectId, parsed.value);
   switch (r.status) {
     case "created":
+      await audit(db, { orgId: r.orgId, actorId: session.user.id, type: "env.created", envId: r.envId, data: { projectId: r.projectId } });
       return json({ orgId: r.orgId, projectId: r.projectId, envId: r.envId }, 201);
     case "not-found":
       return json({ error: "Not found." }, 404);

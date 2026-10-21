@@ -1,5 +1,7 @@
 import { auth } from "@/lib/auth/auth";
 import { db } from "@/lib/db/client";
+import { audit } from "@/lib/audit/store";
+import { orgOfEnv, orgOfProject } from "@/lib/audit/lookup";
 import { readJsonLimited } from "@/lib/http/body";
 import { sameOrigin } from "@/lib/http/origin";
 import { parseNewVersion } from "@/lib/secrets/payload";
@@ -44,8 +46,11 @@ export async function POST(request: Request, { params }: Ctx) {
 
   const result = await addVersion(db, session.user.id, envId, secretId, parsed.value);
   switch (result.status) {
-    case "created":
+    case "created": {
+      const orgId = await orgOfEnv(db, envId);
+      if (orgId) await audit(db, { orgId, actorId: session.user.id, type: parsed.value.deleted ? "secret.deleted" : "secret.updated", envId, data: { secretId, version: result.version } });
       return json({ version: result.version }, 201);
+    }
     case "not-found":
       return json({ error: "Not found." }, 404);
     case "forbidden":

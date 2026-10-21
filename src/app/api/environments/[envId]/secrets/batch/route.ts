@@ -1,5 +1,7 @@
 import { auth } from "@/lib/auth/auth";
 import { db } from "@/lib/db/client";
+import { audit } from "@/lib/audit/store";
+import { orgOfEnv, orgOfProject } from "@/lib/audit/lookup";
 import { readJsonLimited } from "@/lib/http/body";
 import { sameOrigin } from "@/lib/http/origin";
 import { parseBatch } from "@/lib/secrets/payload";
@@ -33,8 +35,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ env
 
   const result = await createSecrets(db, session.user.id, envId, parsed.value);
   switch (result.status) {
-    case "created":
+    case "created": {
+      const orgId = await orgOfEnv(db, envId);
+      if (orgId) for (const secretId of result.ids) await audit(db, { orgId, actorId: session.user.id, type: "secret.created", envId, data: { secretId } });
       return json({ ids: result.ids }, 201);
+    }
     case "forbidden":
       return json({ error: "Your role can read this environment but not add secrets." }, 403);
     case "stale-key":

@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth/auth";
 import { db } from "@/lib/db/client";
+import { audit } from "@/lib/audit/store";
 import { readJsonLimited } from "@/lib/http/body";
 import { sameOrigin } from "@/lib/http/origin";
 import { getVaultRecord } from "@/lib/vault/store";
@@ -25,6 +26,7 @@ export async function POST(request: Request) {
   const r = await createProject(db, session.user.id, parsed.value);
   switch (r.status) {
     case "created":
+      await audit(db, { orgId: r.orgId, actorId: session.user.id, type: "project.created", envId: r.envId, data: { projectId: r.projectId } });
       return json({ orgId: r.orgId, projectId: r.projectId, envId: r.envId }, 201);
     case "forbidden":
       return json({ error: "Only owners and admins can create projects." }, 403);

@@ -1,5 +1,7 @@
 import { auth } from "@/lib/auth/auth";
 import { db } from "@/lib/db/client";
+import { audit } from "@/lib/audit/store";
+import { orgOfInvite } from "@/lib/audit/lookup";
 import { parseToken } from "@/lib/invites/payload";
 import { getInviteOffer, revokeInvite } from "@/lib/invites/store";
 import { guard, json } from "@/lib/workspace/http";
@@ -20,7 +22,11 @@ export async function DELETE(request: Request, { params }: Ctx) {
   const who = await guard(request);
   if (who instanceof Response) return who;
   const { inviteId } = await params;
+  const orgId = await orgOfInvite(db, inviteId);
   const r = await revokeInvite(db, who.userId, inviteId);
-  if (r === "ok") return json({ ok: true });
+  if (r === "ok") {
+    if (orgId) await audit(db, { orgId, actorId: who.userId, type: "invite.revoked", data: { inviteId } });
+    return json({ ok: true });
+  }
   return r === "forbidden" ? json({ error: "Only owners and admins can revoke." }, 403) : json({ error: "Not found." }, 404);
 }

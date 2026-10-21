@@ -1,4 +1,5 @@
 import { db } from "@/lib/db/client";
+import { audit } from "@/lib/audit/store";
 import { readJsonLimited } from "@/lib/http/body";
 import { parseNewInvite } from "@/lib/invites/payload";
 import { createInvite, listPendingInvites } from "@/lib/invites/store";
@@ -25,6 +26,7 @@ export async function POST(request: Request, { params }: Ctx) {
   const r = await createInvite(db, who.userId, { orgId, ...parsed.value });
   switch (r.status) {
     case "created":
+      await audit(db, { orgId, actorId: who.userId, type: "invite.created", data: { inviteId: r.inviteId, emailBound: !!parsed.value.email, environments: parsed.value.grants.length } });
       return json({ inviteId: r.inviteId, expiresAt: r.expiresAt.toISOString() }, 201);
     case "not-found":
       return json({ error: "Not found." }, 404);

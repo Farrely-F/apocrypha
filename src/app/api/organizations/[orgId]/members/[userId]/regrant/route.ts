@@ -1,4 +1,5 @@
 import { db } from "@/lib/db/client";
+import { audit } from "@/lib/audit/store";
 import { readJsonLimited } from "@/lib/http/body";
 import { applyRegrant, planRegrant, type RegrantEnv } from "@/lib/members/regrant";
 import { UUID } from "@/lib/vault/payload";
@@ -35,6 +36,8 @@ export async function POST(request: Request, { params }: Ctx) {
   const r = await applyRegrant(db, who.userId, orgId, userId, envs);
   switch (r.status) {
     case "granted":
+      await audit(db, { orgId, actorId: who.userId, type: "member.regranted", targetUserId: userId, data: { environments: r.envIds.length } });
+      for (const envId of r.envIds) await audit(db, { orgId, actorId: who.userId, type: "env.rotated", envId, targetUserId: userId });
       return json({ envIds: r.envIds });
     case "forbidden":
       return json({ error: "Only owners and admins can do that." }, 403);

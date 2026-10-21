@@ -325,3 +325,51 @@ export const regrantRequest = sqliteTable(
   },
   (table) => [primaryKey({ name: "regrant_request_pk", columns: [table.envId, table.userId] })],
 );
+
+// Per-organisation append-only log. Each row carries the hash of the previous one, so editing or
+// deleting a row breaks the chain from that point on. Rows hold ids only, never names or values.
+export const auditEvent = sqliteTable(
+  "audit_event",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    seq: integer("seq").notNull(),
+    createdAt: integer("created_at", { mode: "number" }).notNull(),
+    // null for a guest (a share link opened without an account)
+    actorId: text("actor_id"),
+    type: text("type").notNull(),
+    envId: text("env_id"),
+    targetUserId: text("target_user_id"),
+    // JSON text, hashed exactly as stored
+    data: text("data").notNull(),
+    prevHash: text("prev_hash").notNull(),
+    hash: text("hash").notNull(),
+  },
+  (table) => [
+    uniqueIndex("audit_event_org_seq_uidx").on(table.organizationId, table.seq),
+    index("audit_event_org_created_idx").on(table.organizationId, table.createdAt),
+  ],
+);
+
+// When old events are pruned, the hash of the last removed row is kept so the rest still verifies.
+export const auditCheckpoint = sqliteTable("audit_checkpoint", {
+  organizationId: text("organization_id")
+    .primaryKey()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  seq: integer("seq").notNull(),
+  hash: text("hash").notNull(),
+});
+
+// One row per session and environment, so reading an environment is logged once per session.
+export const auditEnvRead = sqliteTable(
+  "audit_env_read",
+  {
+    sessionId: text("session_id").notNull(),
+    envId: text("env_id")
+      .notNull()
+      .references(() => environment.id, { onDelete: "cascade" }),
+  },
+  (table) => [primaryKey({ name: "audit_env_read_pk", columns: [table.sessionId, table.envId] })],
+);

@@ -1,4 +1,5 @@
 import { db } from "@/lib/db/client";
+import { audit } from "@/lib/audit/store";
 import { readJsonLimited } from "@/lib/http/body";
 import { getVaultRecord } from "@/lib/vault/store";
 import { createOrganization } from "@/lib/workspace/manage";
@@ -20,5 +21,6 @@ export async function POST(request: Request) {
 
   const r = await createOrganization(db, who.userId, parsed.value);
   if (r.status === "env-exists") return json({ error: "That environment already exists." }, 409);
+  await audit(db, { orgId: r.orgId, actorId: who.userId, type: "org.created", envId: r.envId, data: { projectId: r.projectId } });
   return json({ orgId: r.orgId, projectId: r.projectId, envId: r.envId }, 201);
 }
