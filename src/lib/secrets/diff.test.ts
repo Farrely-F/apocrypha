@@ -29,4 +29,12 @@ describe("diffLines", () => {
       { kind: "add", text: "changed" },
     ]);
   });
+
+  it("falls back to replacing the middle when the table would be huge", () => {
+    const a = Array.from({ length: 3000 }, (_, i) => `a${i}`).join("\n");
+    const b = Array.from({ length: 3000 }, (_, i) => `b${i}`).join("\n");
+    const d = diffLines(a, b);
+    expect(d.filter((l) => l.kind === "del")).toHaveLength(3000);
+    expect(d.filter((l) => l.kind === "add")).toHaveLength(3000);
+  });
 });

@@ -4,6 +4,8 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { Lock } from "lucide-react";
 import { ShellHeader, StatusBar } from "@/components/shell";
 import { Button } from "@/components/ui/button";
+import { WorkspaceNav } from "@/components/workspace/workspace-nav";
+import type { TreeOrg } from "@/lib/workspace/manage";
 import { SignOutButton } from "./sign-out-button";
 import { UnlockScreen } from "./unlock-screen";
 import { useVault, VaultProvider } from "./vault-provider";
@@ -30,7 +32,7 @@ export function StatusInfo({ org, env, keyVersion }: Info) {
  * Locked content is unmounted, not hidden, so a lock also drops whatever the
  * screens held in memory.
  */
-function Frame({ email, children }: { email: string; children: React.ReactNode }) {
+function Frame({ email, tree, children }: { email: string; tree: TreeOrg[]; children: React.ReactNode }) {
   const { status, trusted, lock } = useVault();
   const unlocked = status === "unlocked";
   const [info, setInfo] = useState<Info>({});
@@ -38,6 +40,7 @@ function Frame({ email, children }: { email: string; children: React.ReactNode }
   return (
     <div className="flex h-dvh flex-col bg-background">
       <ShellHeader
+        nav={unlocked ? <WorkspaceNav tree={tree} /> : undefined}
         actions={
           <>
             <span className="hidden text-xs text-bone-faint sm:inline">{email}</span>
@@ -84,15 +87,17 @@ function Frame({ email, children }: { email: string; children: React.ReactNode }
 export function VaultFrame({
   email,
   publicKey,
+  tree,
   children,
 }: {
   email: string;
   publicKey: string;
+  tree: TreeOrg[];
   children: React.ReactNode;
 }) {
   return (
     <VaultProvider publicKey={publicKey}>
-      <Frame email={email}>{children}</Frame>
+      <Frame email={email} tree={tree}>{children}</Frame>
     </VaultProvider>
   );
 }

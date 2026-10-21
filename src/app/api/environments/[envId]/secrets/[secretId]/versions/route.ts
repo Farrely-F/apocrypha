@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth/auth";
 import { db } from "@/lib/db/client";
+import { readJsonLimited } from "@/lib/http/body";
 import { sameOrigin } from "@/lib/http/origin";
 import { parseNewVersion } from "@/lib/secrets/payload";
 import { addVersion, getEnvironmentKeys, listVersions } from "@/lib/secrets/store";
@@ -35,12 +36,9 @@ export async function POST(request: Request, { params }: Ctx) {
     return json({ error: "Not found." }, 404);
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return json({ error: "Request body must be JSON." }, 400);
-  }
+  const read = await readJsonLimited(request, 400_000);
+  if (!read.ok) return json({ error: read.error }, read.status);
+  const body = read.value;
   const parsed = parseNewVersion(body);
   if (!parsed.ok) return json({ error: parsed.error }, 400);
 

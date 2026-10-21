@@ -2,6 +2,9 @@
 // common prefix and suffix are peeled off first, so the quadratic part only
 // runs on the lines that actually differ.
 
+/** Largest LCS table we will build (about 4 MB of memory). */
+const MAX_DIFF_CELLS = 1_000_000;
+
 export type DiffLine = { kind: "same" | "add" | "del"; text: string };
 
 export function diffLines(before: string, after: string): DiffLine[] {
@@ -21,9 +24,18 @@ export function diffLines(before: string, after: string): DiffLine[] {
   const midA = a.slice(start, endA);
   const midB = b.slice(start, endB);
 
-  // Longest common subsequence of the differing middle.
   const n = midA.length;
   const m = midB.length;
+
+  // The table below is n*m cells. Past this, show the middle as replaced
+  // wholesale instead of allocating something huge.
+  if (n * m > MAX_DIFF_CELLS) {
+    out.push(...midA.map((text): DiffLine => ({ kind: "del", text })), ...midB.map((text): DiffLine => ({ kind: "add", text })));
+    for (let k = endA; k < a.length; k++) out.push({ kind: "same", text: a[k] });
+    return out;
+  }
+
+  // Longest common subsequence of the differing middle.
   const width = m + 1;
   const lcs = new Uint32Array((n + 1) * width);
   for (let i = n - 1; i >= 0; i--) {

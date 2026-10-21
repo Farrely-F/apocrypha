@@ -1,0 +1,29 @@
+import { z } from "zod";
+
+/** Plaintext names: short, printable, no control characters. */
+const name = (what: string) =>
+  z
+    .string()
+    .trim()
+    .min(1, `Give the ${what} a name.`)
+    .max(64, "Use at most 64 characters.")
+    .refine((v) => !/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/.test(v), "Use only printable characters.");
+
+/** New project: its name, and the name of the first environment it starts with. */
+export const newProjectSchema = (taken: ReadonlySet<string>) =>
+  z
+    .object({ name: name("project"), environment: name("environment") })
+    .superRefine((v, ctx) => {
+      if (taken.has(v.name.toLowerCase())) {
+        ctx.addIssue({ code: "custom", path: ["name"], message: `A project named ${v.name} already exists.` });
+      }
+    });
+export type NewProjectValues = z.infer<ReturnType<typeof newProjectSchema>>;
+
+export const newEnvironmentSchema = (taken: ReadonlySet<string>) =>
+  z.object({ name: name("environment") }).superRefine((v, ctx) => {
+    if (taken.has(v.name.toLowerCase())) {
+      ctx.addIssue({ code: "custom", path: ["name"], message: `An environment named ${v.name} already exists here.` });
+    }
+  });
+export type NewEnvironmentValues = z.infer<ReturnType<typeof newEnvironmentSchema>>;

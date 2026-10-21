@@ -30,7 +30,6 @@ async function EnvironmentView({ params }: { params: Params }) {
   const view = await getEnvironmentForUser(db, user.id, { orgId, projectId, envId });
   if (!view) notFound();
 
-  const crumb = "text-bone-faint";
   return (
     <>
       <StatusInfo
@@ -38,22 +37,6 @@ async function EnvironmentView({ params }: { params: Params }) {
         env={view.environmentName}
         keyVersion={view.currentKeyVersion}
       />
-      <ol
-        aria-label="Location"
-        className="mx-auto flex max-w-7xl min-w-0 items-center gap-2 whitespace-nowrap text-sm"
-      >
-        <li className="truncate text-bone-dim">{view.orgName}</li>
-        <li aria-hidden className={crumb}>
-          /
-        </li>
-        <li className="truncate text-bone-dim">{view.projectName}</li>
-        <li aria-hidden className={crumb}>
-          /
-        </li>
-        <li aria-current="page" className="truncate text-signal">
-          {view.environmentName}
-        </li>
-      </ol>
       <div className="mx-auto grid max-w-7xl gap-8 pt-6 lg:grid-cols-[20rem_1fr]">
         <Pane title="Environment">
           <dl>

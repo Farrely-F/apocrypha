@@ -17,14 +17,14 @@ const WORKSPACE_FIELDS = [
 /** Names are plaintext and shown in the UI: keep them short and printable. */
 export const MAX_NAME = 64;
 
-type Alg = "x25519" | "p256";
+export type Alg = "x25519" | "p256";
 
 /** Base64url (no padding) length of n bytes. */
 const b64uLen = (n: number) => Math.ceil((n * 4) / 3);
 // Ephemeral public key (32 B x25519, 65 B p256) and AES-GCM ciphertext (32 B key + 16 B tag).
 const EPH_LEN: Record<Alg, number> = { x25519: b64uLen(32), p256: b64uLen(65) };
 const WRAPPED_CT_LEN = b64uLen(48);
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const B64U = /^[A-Za-z0-9_-]+$/;
 const CONTROL = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
 
@@ -104,13 +104,38 @@ export function parseVaultPayload(input: unknown): ParseResult {
   return { ok: true, value: { publicKey, passphraseBlob, recoveryBlob, workspace: workspace.value } };
 }
 
-function parseName(v: unknown, label: string): Parsed<string> {
+export function parseName(v: unknown, label: string): Parsed<string> {
   if (typeof v !== "string") return fail(`${label} must be a string.`);
   const name = v.trim();
   if (name.length === 0) return fail(`${label} must not be empty.`);
   if (name.length > MAX_NAME) return fail(`${label} is too long.`);
   if (CONTROL.test(name)) return fail(`${label} contains control characters.`);
   return { ok: true, value: name };
+}
+
+/**
+ * Shape check for a wrapped environment key: a v1 wrap for the given algorithm.
+ * Returns an error message, or null when it is well formed. The server cannot
+ * open it, so this is all it can verify.
+ */
+export function checkWrappedKey(wrappedKey: unknown, alg: Alg): string | null {
+  if (typeof wrappedKey !== "string" || wrappedKey.length === 0 || wrappedKey.length > MAX_FIELD) {
+    return "wrappedKey must be a wrapped key.";
+  }
+  // v1|<alg>-hkdf-a256gcm|<ephemeral public>|<ciphertext>
+  const parts = wrappedKey.split("|");
+  if (
+    parts.length !== 4 ||
+    parts[0] !== "v1" ||
+    parts[1] !== `${alg}-hkdf-a256gcm` ||
+    !B64U.test(parts[2]) ||
+    parts[2].length !== EPH_LEN[alg] ||
+    !B64U.test(parts[3]) ||
+    parts[3].length !== WRAPPED_CT_LEN
+  ) {
+    return "wrappedKey is not a valid v1 wrapped key for this public key.";
+  }
+  return null;
 }
 
 /**
@@ -130,22 +155,9 @@ function parseWorkspace(input: unknown, alg: Alg): Parsed<WorkspacePayload> {
 
   const { envId, wrappedKey } = ws;
   if (typeof envId !== "string" || !UUID.test(envId)) return fail("workspace.envId must be a UUID.");
-  if (typeof wrappedKey !== "string" || wrappedKey.length === 0 || wrappedKey.length > MAX_FIELD) {
-    return fail("workspace.wrappedKey must be a wrapped key.");
-  }
-  // v1|<alg>-hkdf-a256gcm|<ephemeral public>|<ciphertext>
-  const parts = wrappedKey.split("|");
-  if (
-    parts.length !== 4 ||
-    parts[0] !== "v1" ||
-    parts[1] !== `${alg}-hkdf-a256gcm` ||
-    !B64U.test(parts[2]) ||
-    parts[2].length !== EPH_LEN[alg] ||
-    !B64U.test(parts[3]) ||
-    parts[3].length !== WRAPPED_CT_LEN
-  ) {
-    return fail("workspace.wrappedKey is not a valid v1 wrapped key for this public key.");
-  }
+  const badKey = checkWrappedKey(wrappedKey, alg);
+  if (badKey) return fail(`workspace.${badKey}`);
+  if (typeof wrappedKey !== "string") return fail("workspace.wrappedKey must be a wrapped key.");
 
   const orgName = parseName(ws.orgName, "workspace.orgName");
   if (!orgName.ok) return orgName;

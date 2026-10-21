@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth/auth";
 import { db } from "@/lib/db/client";
+import { readJsonLimited } from "@/lib/http/body";
 import { sameOrigin } from "@/lib/http/origin";
 import { parseBatch } from "@/lib/secrets/payload";
 import { createSecrets, getEnvironmentKeys } from "@/lib/secrets/store";
@@ -18,19 +19,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ env
   if (!session) return json({ error: "Sign in first." }, 401);
 
   const { envId } = await params;
-  if (!isUuid(envId) || !(await getEnvironmentKeys(db, session.user.id, envId))) {
-    return json({ error: "Not found." }, 404);
+  const access = isUuid(envId) ? await getEnvironmentKeys(db, session.user.id, envId) : null;
+  if (!access) return json({ error: "Not found." }, 404);
+  // Decide who may write before reading a potentially large body.
+  if (access.role !== "owner" && access.role !== "admin") {
+    return json({ error: "Your role can read this environment but not add secrets." }, 403);
   }
-  const length = Number(request.headers.get("content-length") ?? 0);
-  if (length > MAX_BODY_BYTES) return json({ error: "That import is too large. Split it up." }, 413);
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return json({ error: "Request body must be JSON." }, 400);
-  }
-  const parsed = parseBatch(body);
+  const read = await readJsonLimited(request, MAX_BODY_BYTES);
+  if (!read.ok) return json({ error: read.error }, read.status);
+  const parsed = parseBatch(read.value);
   if (!parsed.ok) return json({ error: parsed.error }, 400);
 
   const result = await createSecrets(db, session.user.id, envId, parsed.value);
