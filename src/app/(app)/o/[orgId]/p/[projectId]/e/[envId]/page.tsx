@@ -10,6 +10,10 @@ import { isUuid } from "@/lib/workspace/shared";
 
 type Params = Promise<{ orgId: string; projectId: string; envId: string }>;
 
+// The page needs the session and a per-user access check, which cannot be
+// prerendered into the static shell, so it keeps blocking on the server.
+export const instant = false;
+
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-baseline gap-4 py-1.5">
