@@ -56,7 +56,10 @@ export async function previewReset(db: Db | Tx, userId: string): Promise<ResetIm
       ),
     );
   const helped = new Set(helpers.map((h) => h.envId));
-  for (const { current, ...env } of mine) (helped.has(env.envId) ? impact.recoverable : impact.lost).push(env);
+  for (const m of mine) {
+    const env: ResetEnv = { envId: m.envId, projectId: m.projectId, envName: m.envName, projectName: m.projectName, orgName: m.orgName, orgId: m.orgId };
+    (helped.has(env.envId) ? impact.recoverable : impact.lost).push(env);
+  }
   return impact;
 }
 

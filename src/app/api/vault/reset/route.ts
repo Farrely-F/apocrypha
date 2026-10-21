@@ -34,8 +34,9 @@ export async function POST(request: Request) {
   if (!parsed.ok) return json({ error: parsed.error }, 400);
 
   const result = await resetVault(db, session.user.id, parsed.value);
-  if (result.status === "no-vault") return json({ error: "No vault for this account." }, 404);
-  if (result.status === "env-exists") return json({ error: "That environment already exists. Try again." }, 409);
+  if (result.status !== "reset") {
+    return result.status === "no-vault" ? json({ error: "No vault for this account." }, 404) : json({ error: "That environment already exists. Try again." }, 409);
+  }
   const { orgId, projectId, envId, impact } = result;
   return json({ ok: true, orgId, projectId, envId, lost: impact.lost.length, recoverable: impact.recoverable.length }, 200);
 }
