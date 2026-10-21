@@ -239,3 +239,42 @@ export const secretVersion = sqliteTable(
   },
   (table) => [primaryKey({ name: "secret_version_pk", columns: [table.secretId, table.version] })],
 );
+
+// An invite carries environment keys wrapped to a throwaway key pair made in the
+// admin's browser. The throwaway private key lives only in the link's #fragment.
+export const invite = sqliteTable(
+  "invite",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    createdBy: text("created_by").notNull(),
+    role: text("role").$type<OrgRole>().notNull().default("member"),
+    // When set, only a verified account with this email may redeem.
+    email: text("email"),
+    // `v1|<alg>|<key>` of the throwaway pair; its algorithm fixes the wrapped-key format.
+    ephemeralPublicKey: text("ephemeral_public_key").notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    usedAt: integer("used_at", { mode: "timestamp_ms" }),
+    usedBy: text("used_by"),
+    revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
+    createdAt: createdAt(),
+  },
+  (table) => [index("invite_organization_id_idx").on(table.organizationId)],
+);
+
+export const inviteGrant = sqliteTable(
+  "invite_grant",
+  {
+    inviteId: text("invite_id")
+      .notNull()
+      .references(() => invite.id, { onDelete: "cascade" }),
+    envId: text("env_id")
+      .notNull()
+      .references(() => environment.id, { onDelete: "cascade" }),
+    keyVersion: integer("key_version").notNull(),
+    wrappedKey: text("wrapped_key").notNull(),
+  },
+  (table) => [primaryKey({ name: "invite_grant_pk", columns: [table.inviteId, table.envId] })],
+);

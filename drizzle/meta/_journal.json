@@ -36,6 +36,13 @@
       "when": 1792586888715,
       "tag": "0004_secret_version_deleted",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1792591714491,
+      "tag": "0005_invites",
+      "breakpoints": true
     }
   ]
 }
