@@ -81,3 +81,17 @@ export const verification = sqliteTable(
   },
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
+
+// One vault per user: the public key plus the private key wrapped two ways
+// (passphrase, recovery key). The server never sees the passphrase, the
+// recovery key or the unwrapped private key. See docs/DESIGN.md section 3.
+export const vault = sqliteTable("vault", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  publicKey: text("public_key").notNull(),
+  passphraseBlob: text("passphrase_blob").notNull(),
+  recoveryBlob: text("recovery_blob").notNull(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
