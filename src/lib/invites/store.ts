@@ -12,7 +12,7 @@ const BUILDERS: readonly OrgRole[] = ["owner", "admin"];
 /** Hash of the fragment secret, as stored. Empty secrets never match (the column default is empty). */
 export const hashRedeemToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
-export type WrappedGrant = { envId: string; wrappedKey: string };
+export type WrappedGrant = { envId: string; keyVersion: number; wrappedKey: string };
 
 async function roleIn(db: Db, userId: string, orgId: string): Promise<OrgRole | null> {
   const [row] = await db
@@ -43,26 +43,27 @@ export async function createInvite(
   if (!role) return { status: "not-found" };
   if (!BUILDERS.includes(role)) return { status: "forbidden" };
 
-  const envIds = input.grants.map((g) => g.envId);
-  if (envIds.length === 0 || new Set(envIds).size !== envIds.length) return { status: "bad-environments" };
-
-  // Environments of this org that the inviter holds at the current key version.
+  // The inviter must hold the current key of every environment, and every older version too,
+  // and must wrap exactly those: a newcomer who only got the newest key could not read history.
+  const pairs = input.grants.map((g) => `${g.envId}:${g.keyVersion}`);
+  if (input.grants.length === 0 || new Set(pairs).size !== pairs.length) return { status: "bad-environments" };
+  const envIds = [...new Set(input.grants.map((g) => g.envId))];
   const held = await db
-    .select({ envId: schema.environment.id, keyVersion: schema.environment.currentKeyVersion })
-    .from(schema.environment)
+    .select({ envId: schema.environmentKeyGrant.envId, keyVersion: schema.environmentKeyGrant.keyVersion, current: schema.environment.currentKeyVersion })
+    .from(schema.environmentKeyGrant)
+    .innerJoin(schema.environment, eq(schema.environment.id, schema.environmentKeyGrant.envId))
     .innerJoin(schema.project, eq(schema.project.id, schema.environment.projectId))
-    .innerJoin(
-      schema.environmentKeyGrant,
+    .where(
       and(
-        eq(schema.environmentKeyGrant.envId, schema.environment.id),
+        eq(schema.project.organizationId, input.orgId),
         eq(schema.environmentKeyGrant.principalType, "user"),
         eq(schema.environmentKeyGrant.principalId, userId),
-        eq(schema.environmentKeyGrant.keyVersion, schema.environment.currentKeyVersion),
+        inArray(schema.environmentKeyGrant.envId, envIds),
       ),
-    )
-    .where(and(eq(schema.project.organizationId, input.orgId), inArray(schema.environment.id, envIds)));
-  if (held.length !== envIds.length) return { status: "bad-environments" };
-  const versions = new Map(held.map((h) => [h.envId, h.keyVersion]));
+    );
+  const heldPairs = new Set(held.map((h) => `${h.envId}:${h.keyVersion}`));
+  const hasCurrent = envIds.every((e) => held.some((h) => h.envId === e && h.keyVersion === h.current));
+  if (!hasCurrent || heldPairs.size !== pairs.length || pairs.some((p) => !heldPairs.has(p))) return { status: "bad-environments" };
 
   const inviteId = crypto.randomUUID();
   const expiresAt = new Date(now.getTime() + INVITE_TTL_MS);
@@ -78,7 +79,7 @@ export async function createInvite(
       expiresAt,
     });
     await tx.insert(schema.inviteGrant).values(
-      input.grants.map((g) => ({ inviteId, envId: g.envId, keyVersion: versions.get(g.envId)!, wrappedKey: g.wrappedKey })),
+      input.grants.map((g) => ({ inviteId, envId: g.envId, keyVersion: g.keyVersion, wrappedKey: g.wrappedKey })),
     );
   });
   return { status: "created", inviteId, expiresAt };
@@ -164,14 +165,14 @@ export async function redeemInvite(
   const offer = await getInviteOffer(db, user, inviteId, token, now);
   if (!offer) return { status: "not-found" };
 
-  const wanted = new Set(offer.grants.map((g) => g.envId));
-  const got = new Set(rewrapped.map((g) => g.envId));
+  const pair = (g: { envId: string; keyVersion: number }) => `${g.envId}:${g.keyVersion}`;
+  const wanted = new Set(offer.grants.map(pair));
+  const got = new Set(rewrapped.map(pair));
   if (got.size !== rewrapped.length || got.size !== wanted.size || [...got].some((e) => !wanted.has(e))) return { status: "bad-grants" };
 
   const [inv] = await db.select({ orgId: schema.invite.organizationId, role: schema.invite.role }).from(schema.invite).where(eq(schema.invite.id, inviteId)).limit(1);
   if (await roleIn(db, user.id, inv.orgId)) return { status: "already-member" };
 
-  const versions = new Map(offer.grants.map((g) => [g.envId, g.keyVersion]));
   try {
     return await db.transaction(async (tx) => {
       const burned = await tx
@@ -182,7 +183,7 @@ export async function redeemInvite(
       if (burned.length === 0) throw new Error("gone");
       await tx.insert(schema.member).values({ id: crypto.randomUUID(), organizationId: inv.orgId, userId: user.id, role: inv.role });
       await tx.insert(schema.environmentKeyGrant).values(
-        rewrapped.map((g) => ({ envId: g.envId, principalType: "user" as const, principalId: user.id, keyVersion: versions.get(g.envId)!, wrappedKey: g.wrappedKey })),
+        rewrapped.map((g) => ({ envId: g.envId, principalType: "user" as const, principalId: user.id, keyVersion: g.keyVersion, wrappedKey: g.wrappedKey })),
       );
       return { status: "joined" as const, orgId: inv.orgId };
     });

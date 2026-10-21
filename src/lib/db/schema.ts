@@ -279,5 +279,5 @@ export const inviteGrant = sqliteTable(
     keyVersion: integer("key_version").notNull(),
     wrappedKey: text("wrapped_key").notNull(),
   },
-  (table) => [primaryKey({ name: "invite_grant_pk", columns: [table.inviteId, table.envId] })],
+  (table) => [primaryKey({ name: "invite_grant_pk", columns: [table.inviteId, table.envId, table.keyVersion] })],
 );

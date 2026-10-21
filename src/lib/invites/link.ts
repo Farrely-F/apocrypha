@@ -21,6 +21,7 @@ export async function sealInvite(keys: { envId: string; keyVersion: number; key:
   const grants = await Promise.all(
     keys.map(async (k) => ({
       envId: k.envId,
+      keyVersion: k.keyVersion,
       wrappedKey: await wrapEnvironmentKey(k.key, ephemeral.publicKey, { envId: k.envId, keyVersion: k.keyVersion }),
     })),
   );
@@ -47,12 +48,12 @@ export async function openInvite(
 ) {
   const { alg, secret } = readFragment(fragment);
   const ephemeral: KeyPair = await importKeyPair(fromB64u(secret), alg);
-  const out: { envId: string; wrappedKey: string }[] = [];
+  const out: { envId: string; keyVersion: number; wrappedKey: string }[] = [];
   for (const g of grants) {
     const ctx = { envId: g.envId, keyVersion: g.keyVersion };
     const key = await unwrapEnvironmentKey(g.wrappedKey, ephemeral, ctx);
     try {
-      out.push({ envId: g.envId, wrappedKey: await wrapEnvironmentKey(key, myPublicKey, ctx) });
+      out.push({ envId: g.envId, keyVersion: g.keyVersion, wrappedKey: await wrapEnvironmentKey(key, myPublicKey, ctx) });
     } finally {
       key.fill(0);
     }

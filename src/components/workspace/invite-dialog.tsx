@@ -57,8 +57,8 @@ export function InviteDialog({ org, open, onOpenChange }: { org: TreeOrg; open: 
       const keys = [];
       for (const envId of values.envs) {
         const held = await fetchEnvironmentKeys(envId, keyPair);
-        const keyVersion = Math.max(...held.keys());
-        keys.push({ envId, keyVersion, key: held.get(keyVersion)! });
+        // every version we hold, so the newcomer can read older secrets too
+        for (const [version, key] of held) keys.push({ envId, keyVersion: version, key });
       }
       const sealed = await sealInvite(keys);
       keys.forEach((k) => k.key.fill(0));

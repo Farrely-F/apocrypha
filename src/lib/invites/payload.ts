@@ -12,11 +12,12 @@ function grants(input: unknown, alg: Alg): Parsed<WrappedGrant[]> {
   for (const g of input) {
     if (typeof g !== "object" || g === null) return fail("Each grant must be an object.");
     const o = g as Record<string, unknown>;
-    if (Object.keys(o).some((k) => k !== "envId" && k !== "wrappedKey")) return fail("Unexpected grant field.");
+    if (Object.keys(o).some((k) => k !== "envId" && k !== "keyVersion" && k !== "wrappedKey")) return fail("Unexpected grant field.");
     if (typeof o.envId !== "string" || !UUID.test(o.envId)) return fail("grant.envId must be a UUID.");
+    if (typeof o.keyVersion !== "number" || !Number.isInteger(o.keyVersion) || o.keyVersion < 1) return fail("grant.keyVersion must be a positive integer.");
     const bad = checkWrappedKey(o.wrappedKey, alg);
     if (bad) return fail(`grant.${bad}`);
-    out.push({ envId: o.envId.toLowerCase(), wrappedKey: o.wrappedKey as string });
+    out.push({ envId: o.envId.toLowerCase(), keyVersion: o.keyVersion, wrappedKey: o.wrappedKey as string });
   }
   return { ok: true, value: out };
 }
