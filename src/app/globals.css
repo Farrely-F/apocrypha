@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "./brand.css";
 
 /*
  * Mora theme. Terminal-native, abyssal. Dark only: the app has one world.
@@ -25,6 +26,11 @@
   --color-signal-ink: var(--signal-ink);
   --color-blood: var(--blood);
   --color-blood-bright: var(--blood-bright);
+  /* Atmosphere, from the brand book. Never the UI signal. */
+  --color-ink: var(--ink);
+  --color-miasma: var(--miasma);
+  --color-lamp: var(--lamp);
+  --color-lamp-dim: var(--lamp-dim);
 
   /* shadcn semantic names, mapped onto the palette */
   --color-background: var(--background);
@@ -126,6 +132,12 @@
   --blood: oklch(0.45 0.14 27);
   --blood-bright: oklch(0.69 0.16 27);
 
+  /* Atmosphere only (brand book): ink sea, sky haze, the one open lamp. */
+  --ink: oklch(0.11 0.012 195);
+  --miasma: oklch(0.34 0.06 133);
+  --lamp: oklch(0.8 0.12 98);
+  --lamp-dim: oklch(0.55 0.08 98);
+
   /* shadcn semantics */
   --background: var(--abyss);
   --foreground: var(--bone);
@@ -167,6 +179,8 @@
   }
   html {
     @apply font-sans;
+    scroll-behavior: smooth;
+    scroll-padding-top: 3.5rem;
     background: var(--abyss);
     font-feature-settings: "calt" 1, "zero" 1;
     -webkit-text-size-adjust: 100%;
@@ -229,6 +243,17 @@
 @keyframes mora-caret {
   0%, 49% { opacity: 1; }
   50%, 100% { opacity: 0; }
+}
+
+/* Opening beat on the landing page: ink lifts off the painting once. */
+@keyframes mora-veil {
+  from { opacity: 1; }
+  to { opacity: 0; visibility: hidden; }
+}
+
+.hero-veil {
+  animation: mora-veil 1500ms cubic-bezier(0.16, 1, 0.3, 1) 150ms both;
+  pointer-events: none;
 }
 
 .mora-flicker {

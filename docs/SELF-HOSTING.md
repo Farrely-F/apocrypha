@@ -30,7 +30,7 @@ Everything is an environment variable.
 | Variable | Required | Meaning |
 | --- | --- | --- |
 | `BETTER_AUTH_SECRET` | yes | Signs sessions. Long and random. Changing it signs everyone out. |
-| `BETTER_AUTH_URL` | yes | The public URL users open, with no trailing slash. Used for OAuth callbacks and origin checks. |
+| `BETTER_AUTH_URL` | yes | The public URL users open, with no trailing slash. Used for OAuth callbacks and origin checks, and (set at build time, which `docker compose` does) for the landing page's canonical, share-preview and sitemap URLs. |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | for GitHub sign-in | OAuth app credentials. |
 | `DATABASE_URL` | no | Defaults to `file:/data/apocrypha.db` in the container. A `libsql://` Turso URL also works (then set `DATABASE_AUTH_TOKEN`). |
 | `AUDIT_RETENTION_DAYS` | no | How long audit events are kept. Default 180. |

@@ -2,7 +2,11 @@
 # The database is a single SQLite (libSQL) file on the named volume below. Back it up (docs/SELF-HOSTING.md).
 services:
   apocrypha:
-    build: .
+    build:
+      context: .
+      args:
+        # Baked into canonical, Open Graph and sitemap URLs of the landing page.
+        BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
     image: apocrypha:local
     restart: unless-stopped
     ports:

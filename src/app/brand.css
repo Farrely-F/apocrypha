@@ -1,0 +1,144 @@
+/*
+ * Apocrypha brand utilities (brand book draft 0.1).
+ * Hue ramp: abyss 195, signal 160, miasma 133, lamp 98, bone 88.
+ * Textures are for the edges of the product: landing, unlock, empty states and
+ * chrome. Never behind tables, editors or secret values. One lamp per view.
+ */
+
+/* ---------- sections and stages ---------- */
+@utility mora-tex-miasma {
+  background-color: var(--abyss);
+  background-image:
+    radial-gradient(70% 60% at 18% 0%, color-mix(in oklch, var(--miasma) 70%, transparent), transparent 72%),
+    radial-gradient(55% 50% at 88% 6%, color-mix(in oklch, var(--miasma) 45%, transparent), transparent 70%),
+    linear-gradient(to bottom, color-mix(in oklch, var(--miasma) 30%, transparent), var(--abyss) 90%);
+}
+
+@utility mora-tex-ink {
+  background-color: var(--ink);
+  background-image:
+    linear-gradient(to bottom, color-mix(in oklch, var(--miasma) 28%, transparent), transparent 55%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='480' height='320'%3E%3Cfilter id='f' x='0' y='0' width='100%' height='100%'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.006 0.035' numOctaves='3' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.16  0 0 0 0 0.38  0 0 0 0 0.32  1.1 0 0 0 -0.46'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23f)'/%3E%3C/svg%3E");
+  background-size: auto, 480px 320px;
+}
+
+@utility mora-tex-ink-painted {
+  background-color: var(--ink);
+  background-image: url("/brand/ink-sea-tile.webp");
+  background-size: 400px 400px;
+}
+
+@utility mora-tex-stacks-painted {
+  background-color: var(--ink);
+  background-image:
+    linear-gradient(rgb(0 0 0 / 0.35), rgb(0 0 0 / 0.35)),
+    url("/brand/spine-wall.webp");
+  background-size: auto, 392px 584px;
+}
+
+@utility mora-tex-leaves {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260' fill='%23ddd3b0' fill-opacity='.05' stroke='%23ddd3b0' stroke-opacity='.16'%3E%3Crect x='30' y='38' width='14' height='19' transform='rotate(24 37 47)'/%3E%3Crect x='118' y='22' width='10' height='14' transform='rotate(-31 123 29)'/%3E%3Crect x='196' y='64' width='16' height='21' transform='rotate(52 204 74)'/%3E%3Crect x='64' y='120' width='9' height='12' transform='rotate(-12 68 126)'/%3E%3Crect x='150' y='140' width='15' height='20' transform='rotate(-48 157 150)'/%3E%3Crect x='226' y='176' width='11' height='15' transform='rotate(19 231 183)'/%3E%3Crect x='20' y='204' width='13' height='17' transform='rotate(-27 26 212)'/%3E%3Crect x='100' y='222' width='9' height='12' transform='rotate(40 104 228)'/%3E%3C/svg%3E");
+  background-size: 260px 260px;
+}
+
+@utility mora-tex-lamp {
+  background-color: var(--abyss);
+  background-image:
+    radial-gradient(55% 80% at 100% 0%, color-mix(in oklch, var(--lamp) 16%, transparent), transparent 70%);
+}
+
+@utility mora-bg-library {
+  background-color: var(--abyss);
+  background-image: url("/brand/hero-library.webp");
+  background-size: cover;
+  background-position: 70% center;
+}
+
+@utility mora-bg-lamplit {
+  background-color: var(--abyss);
+  background-image: url("/brand/lamplit-stone.webp");
+  background-size: cover;
+  background-position: top right;
+}
+
+@utility mora-bg-gate {
+  background-color: var(--abyss);
+  background-image: url("/brand/archway-gate.webp");
+  background-size: cover;
+  background-position: center 40%;
+}
+
+@utility mora-overlay-pages {
+  position: relative;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: url("/brand/drifting-pages.webp") 0 0 / 380px auto repeat;
+    opacity: 0.16;
+    pointer-events: none;
+  }
+}
+
+/* ---------- card backgrounds ---------- */
+@utility mora-tex-vellum {
+  background-color: var(--pane);
+  background-image:
+    repeating-linear-gradient(to bottom, transparent 0 23px, color-mix(in oklch, var(--bone) 5%, transparent) 23px 24px),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g' x='0' y='0' width='100%' height='100%'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.9  0 0 0 0 0.86  0 0 0 0 0.7  0.4 0 0 0 -0.14'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size: auto, 160px 160px;
+}
+
+@utility mora-tex-inkwell {
+  background-color: var(--pane);
+  background-image:
+    radial-gradient(80% 90% at 100% 100%, var(--ink), transparent 70%),
+    radial-gradient(50% 60% at 0% 0%, color-mix(in oklch, var(--signal-dim) 10%, transparent), transparent 70%);
+}
+
+/* ---------- frames ---------- */
+@utility mora-frame-corners {
+  --frame-corner: var(--signal-dim);
+  background-image:
+    linear-gradient(var(--frame-corner), var(--frame-corner)),
+    linear-gradient(var(--frame-corner), var(--frame-corner)),
+    linear-gradient(var(--frame-corner), var(--frame-corner)),
+    linear-gradient(var(--frame-corner), var(--frame-corner)),
+    linear-gradient(var(--frame-corner), var(--frame-corner)),
+    linear-gradient(var(--frame-corner), var(--frame-corner)),
+    linear-gradient(var(--frame-corner), var(--frame-corner)),
+    linear-gradient(var(--frame-corner), var(--frame-corner));
+  background-position: 0 0, 0 0, 100% 0, 100% 0, 0 100%, 0 100%, 100% 100%, 100% 100%;
+  background-size: 10px 2px, 2px 10px, 10px 2px, 2px 10px, 10px 2px, 2px 10px, 10px 2px, 2px 10px;
+  background-repeat: no-repeat;
+  background-origin: border-box;
+}
+
+@utility mora-frame-lit {
+  --frame-corner: var(--lamp);
+  border-color: var(--lamp-dim);
+}
+
+@utility mora-frame-plate {
+  outline: 1px solid var(--hairline-faint);
+  outline-offset: 3px;
+}
+
+/* ---------- dividers ---------- */
+@utility mora-rule-diamond {
+  position: relative;
+  height: 1px;
+  background: var(--hairline);
+  &::after {
+    content: "\25C6";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    translate: -50% -50%;
+    padding: 0 0.6rem;
+    background: var(--background);
+    color: var(--signal-dim);
+    font-size: 0.75rem;
+    line-height: 1;
+  }
+}

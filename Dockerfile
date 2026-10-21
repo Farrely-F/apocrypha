@@ -12,9 +12,12 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Placeholders only so the build can import the auth module. Real values are read at runtime, never baked in.
+# The public URL is baked into the landing page's canonical, Open Graph and sitemap URLs, so pass it
+# at build time (docker compose does). Everything else is a placeholder so the build can import the
+# auth module; real values are read at runtime, never baked in.
+ARG BETTER_AUTH_URL=http://localhost:3000
 RUN BETTER_AUTH_SECRET=build-only-placeholder-0123456789abcdef \
-    BETTER_AUTH_URL=http://localhost:3000 \
+    BETTER_AUTH_URL=${BETTER_AUTH_URL} \
     DATABASE_URL=file:/tmp/build.db \
     npm run build
 
