@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { AppShell, Pane, ShellHeader } from "@/components/shell";
+import { Pane } from "@/components/shell";
 
 // Shown for an environment that does not exist or that this account holds no
 // grant for. The two are deliberately indistinguishable.
 export default function EnvironmentNotFound() {
   return (
-    <AppShell header={<ShellHeader />} status={null}>
+    <>
       <div className="mx-auto max-w-2xl pt-6">
         <Pane title="Not found" meta="404">
           <p className="text-bone">No such environment, or you don&apos;t have access to it.</p>
@@ -19,6 +19,6 @@ export default function EnvironmentNotFound() {
           </p>
         </Pane>
       </div>
-    </AppShell>
+    </>
   );
 }

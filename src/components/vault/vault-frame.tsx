@@ -1,10 +1,28 @@
 "use client";
 
+import { createContext, useContext, useEffect, useState } from "react";
 import { Lock } from "lucide-react";
 import { ShellHeader, StatusBar } from "@/components/shell";
 import { Button } from "@/components/ui/button";
+import { SignOutButton } from "./sign-out-button";
 import { UnlockScreen } from "./unlock-screen";
 import { useVault, VaultProvider } from "./vault-provider";
+
+type Info = { org?: string | null; env?: string | null; keyVersion?: number | string | null };
+const InfoContext = createContext<((info: Info) => void) | null>(null);
+
+/**
+ * Lets a page tell the status bar which org, environment and key version it is
+ * showing. Renders nothing; clears itself when the page unmounts.
+ */
+export function StatusInfo({ org, env, keyVersion }: Info) {
+  const set = useContext(InfoContext);
+  useEffect(() => {
+    set?.({ org, env, keyVersion });
+    return () => set?.({});
+  }, [set, org, env, keyVersion]);
+  return null;
+}
 
 /**
  * The frame for every app route: header, status bar with the lock state and a
@@ -15,18 +33,31 @@ import { useVault, VaultProvider } from "./vault-provider";
 function Frame({ email, children }: { email: string; children: React.ReactNode }) {
   const { status, trusted, lock } = useVault();
   const unlocked = status === "unlocked";
+  const [info, setInfo] = useState<Info>({});
 
   return (
     <div className="flex h-dvh flex-col bg-background">
-      <ShellHeader />
+      <ShellHeader
+        actions={
+          <>
+            <span className="hidden text-xs text-bone-faint sm:inline">{email}</span>
+            <SignOutButton />
+          </>
+        }
+      />
       <div id="main" className="min-h-0 flex-1 overflow-y-auto">
         {unlocked ? (
-          <div className="p-4 sm:p-6">{children}</div>
+          <InfoContext.Provider value={setInfo}>
+            <div className="p-4 sm:p-6">{children}</div>
+          </InfoContext.Provider>
         ) : status === "locked" ? (
           <UnlockScreen email={email} />
         ) : null}
       </div>
       <StatusBar
+        org={unlocked ? info.org : null}
+        env={unlocked ? info.env : null}
+        keyVersion={unlocked ? info.keyVersion : null}
         lock={unlocked ? "unlocked" : "locked"}
         trailing={
           unlocked ? (

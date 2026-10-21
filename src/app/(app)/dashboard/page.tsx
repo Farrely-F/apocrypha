@@ -1,11 +1,10 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { AppShell, Pane, ShellHeader } from "@/components/shell";
+import { Pane } from "@/components/shell";
 import { requireSession } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
 import { getDefaultEnvironmentForUser } from "@/lib/workspace/queries";
 import { environmentPath } from "@/lib/workspace/shared";
-import { SignOutButton } from "./sign-out-button";
 
 // All content lives behind the session check: anything rendered outside the
 // Suspense boundary is prerendered into the static shell and would be sent to
@@ -19,7 +18,7 @@ async function Dashboard() {
   // A vault made before workspaces existed has no environment key, and the
   // server cannot make one: it has to be wrapped in the user's browser.
   return (
-    <AppShell header={<ShellHeader actions={<SignOutButton />} />} status={null}>
+    <>
       <div className="mx-auto max-w-2xl pt-6">
         <Pane title="No workspace" meta={user.email}>
           <p className="text-bone">This account has a vault but no environment.</p>
@@ -29,7 +28,7 @@ async function Dashboard() {
           </p>
         </Pane>
       </div>
-    </AppShell>
+    </>
   );
 }
 

@@ -136,6 +136,12 @@ export function CreateVaultForm({ email }: { email: string }) {
       }
       const ids = (await res.json().catch(() => null)) as Partial<WorkspaceIds> | null;
       setUnlockedKeyPair(vault.keyPair);
+      // Next keeps this page mounted but hidden after navigating away, so drop
+      // the recovery key and typed confirmation from state and the DOM now.
+      setVault(null);
+      setTyped("");
+      setCopied(false);
+      setStep("passphrase");
       // The vault is saved. Land in the new environment; /dashboard resolves
       // to the same place if the response was unreadable.
       router.replace(

@@ -1,3 +1,4 @@
 export { UnlockScreen } from "./unlock-screen";
-export { VaultFrame } from "./vault-frame";
+export { SignOutButton } from "./sign-out-button";
+export { StatusInfo, VaultFrame } from "./vault-frame";
 export { useVault, VaultProvider, type VaultStatus } from "./vault-provider";
