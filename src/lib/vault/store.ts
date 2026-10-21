@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import type { LibSQLDatabase } from "drizzle-orm/libsql";
 import * as schema from "../db/schema";
+import { insertPersonalWorkspace, type WorkspaceIds } from "../workspace/queries";
 import type { VaultPayload } from "./payload";
 
 type Db = LibSQLDatabase<typeof schema>;
@@ -10,16 +11,36 @@ export async function getVaultRecord(db: Db, userId: string) {
   return row ?? null;
 }
 
-/** One vault per user. A second attempt never overwrites the first. */
+class VaultExists extends Error {}
+
+export type CreateVaultResult = ({ status: "created" } & WorkspaceIds) | { status: "exists" };
+
+/**
+ * Create the user's vault together with their personal org, membership,
+ * project, environment and environment-key grant, in ONE transaction: either
+ * all of it exists afterwards or none of it. One vault per user; a second
+ * attempt changes nothing. Any other failure (for example an environment id
+ * that is already taken) rolls everything back and is rethrown.
+ */
 export async function createVaultRecord(
   db: Db,
   userId: string,
   payload: VaultPayload,
-): Promise<"created" | "exists"> {
-  const inserted = await db
-    .insert(schema.vault)
-    .values({ userId, ...payload })
-    .onConflictDoNothing()
-    .returning({ userId: schema.vault.userId });
-  return inserted.length > 0 ? "created" : "exists";
+): Promise<CreateVaultResult> {
+  const { workspace, ...vault } = payload;
+  try {
+    return await db.transaction(async (tx) => {
+      const inserted = await tx
+        .insert(schema.vault)
+        .values({ userId, ...vault })
+        .onConflictDoNothing()
+        .returning({ userId: schema.vault.userId });
+      if (inserted.length === 0) throw new VaultExists();
+      const ids = await insertPersonalWorkspace(tx, userId, workspace);
+      return { status: "created" as const, ...ids };
+    });
+  } catch (error) {
+    if (error instanceof VaultExists) return { status: "exists" };
+    throw error;
+  }
 }

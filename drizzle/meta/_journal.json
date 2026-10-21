@@ -15,6 +15,13 @@
       "when": 1792576612165,
       "tag": "0001_vault",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792577213080,
+      "tag": "0002_workspace",
+      "breakpoints": true
     }
   ]
 }
