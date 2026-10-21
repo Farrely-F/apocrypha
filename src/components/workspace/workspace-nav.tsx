@@ -31,6 +31,7 @@ import {
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useVault } from "@/components/vault/vault-provider";
+import { CommandPalette } from "@/components/workspace/command-palette";
 import { generateEnvironmentKey, wrapEnvironmentKey } from "@/lib/crypto";
 import {
   newEnvironmentSchema,
@@ -168,6 +169,8 @@ export function WorkspaceNav({ tree }: { tree: TreeOrg[] }) {
           taken={new Set(project.environments.map((e) => e.name.toLowerCase()))}
         />
       )}
+      <CommandPalette org={org} />
+
       {manage && project && (
         <ManageDialog
           key={`${manage.kind}-${manage.mode}`}
