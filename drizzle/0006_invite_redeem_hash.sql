@@ -1,0 +1,1 @@
+ALTER TABLE `invite` ADD `redeem_hash` text DEFAULT '' NOT NULL;

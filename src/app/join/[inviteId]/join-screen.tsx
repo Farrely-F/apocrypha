@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { openInvite } from "@/lib/invites/link";
+import { openInvite, readFragment } from "@/lib/invites/link";
 
 type Offer = { orgName: string; grants: { envId: string; keyVersion: number; wrappedKey: string }[] };
 type State = "loading" | "signin" | "novault" | "invalid" | "ready" | "joining";
@@ -33,7 +33,13 @@ export function JoinScreen({ inviteId }: { inviteId: string }) {
       } catch {
         /* storage unavailable: the link must be opened and used in one go */
       }
-      const res = await fetch(`/api/invites/${inviteId}`, { cache: "no-store" });
+      let token = "";
+      try {
+        token = readFragment(sessionStorage.getItem(storeKey(inviteId)) ?? "").token;
+      } catch {
+        return setState("invalid");
+      }
+      const res = await fetch(`/api/invites/${inviteId}`, { cache: "no-store", headers: { "x-invite-token": token } });
       if (res.status === 401) return setState("signin");
       if (!res.ok) return setState("invalid");
       const me = await fetch("/api/vault/me", { cache: "no-store" });
@@ -55,7 +61,7 @@ export function JoinScreen({ inviteId }: { inviteId: string }) {
       const grants = await openInvite(fragment, offer.grants, me.publicKey);
       const res = await fetch(`/api/invites/${inviteId}/redeem`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "x-invite-token": readFragment(fragment).token },
         body: JSON.stringify({ grants }),
       });
       const body = (await res.json().catch(() => null)) as { error?: string } | null;

@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth/auth";
 import { db } from "@/lib/db/client";
+import { parseToken } from "@/lib/invites/payload";
 import { getInviteOffer, revokeInvite } from "@/lib/invites/store";
 import { guard, json } from "@/lib/workspace/http";
 
@@ -11,7 +12,7 @@ export async function GET(request: Request, { params }: Ctx) {
   if (who instanceof Response) return who;
   const session = await auth.api.getSession({ headers: request.headers });
   const { inviteId } = await params;
-  const offer = session ? await getInviteOffer(db, session.user, inviteId) : null;
+  const offer = session ? await getInviteOffer(db, session.user, inviteId, parseToken(request.headers.get("x-invite-token"))) : null;
   return offer ? json(offer) : json({ error: "This invite is not valid." }, 404);
 }
 

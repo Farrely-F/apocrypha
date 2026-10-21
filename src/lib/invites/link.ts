@@ -25,7 +25,18 @@ export async function sealInvite(keys: { envId: string; keyVersion: number; key:
     })),
   );
   const secret = await exportPrivateKey(ephemeral.privateKey);
-  return { ephemeralPublicKey: ephemeral.publicKey, grants, fragment: `${ephemeral.alg}.${toB64u(secret)}` };
+  // A second secret, only its hash goes to the server: the invite id alone cannot redeem.
+  const token = toB64u(crypto.getRandomValues(new Uint8Array(32)));
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)));
+  const redeemHash = Array.from(digest, (b) => b.toString(16).padStart(2, "0")).join("");
+  return { ephemeralPublicKey: ephemeral.publicKey, redeemHash, grants, fragment: `${ephemeral.alg}.${toB64u(secret)}.${token}` };
+}
+
+/** Split a link fragment into the key material and the redeem secret. */
+export function readFragment(fragment: string) {
+  const [alg, secret, token] = fragment.split(".");
+  if ((alg !== "x25519" && alg !== "p256") || !secret || !token) throw new Error("This invite link is incomplete. Ask for a new one.");
+  return { alg: alg as KeyAlg, secret, token };
 }
 
 /** Invitee side: unwrap with the fragment's key and re-wrap to their own public key. Needs no unlocked vault. */
@@ -34,9 +45,8 @@ export async function openInvite(
   grants: { envId: string; keyVersion: number; wrappedKey: string }[],
   myPublicKey: string,
 ) {
-  const [alg, secret] = fragment.split(".");
-  if ((alg !== "x25519" && alg !== "p256") || !secret) throw new Error("This invite link is incomplete. Ask for a new one.");
-  const ephemeral: KeyPair = await importKeyPair(fromB64u(secret), alg as KeyAlg);
+  const { alg, secret } = readFragment(fragment);
+  const ephemeral: KeyPair = await importKeyPair(fromB64u(secret), alg);
   const out: { envId: string; wrappedKey: string }[] = [];
   for (const g of grants) {
     const ctx = { envId: g.envId, keyVersion: g.keyVersion };

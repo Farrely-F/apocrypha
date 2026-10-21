@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth/auth";
 import { db } from "@/lib/db/client";
 import { readJsonLimited } from "@/lib/http/body";
-import { parseRedeem } from "@/lib/invites/payload";
+import { parseRedeem, parseToken } from "@/lib/invites/payload";
 import { redeemInvite } from "@/lib/invites/store";
 import { getVaultRecord } from "@/lib/vault/store";
 import { guard, json } from "@/lib/workspace/http";
@@ -20,7 +20,7 @@ export async function POST(request: Request, { params }: Ctx) {
   const parsed = parseRedeem(read.value, vault.publicKey.split("|")[1] === "p256" ? "p256" : "x25519");
   if (!parsed.ok) return json({ error: parsed.error }, 400);
   const { inviteId } = await params;
-  const r = await redeemInvite(db, session.user, inviteId, parsed.value);
+  const r = await redeemInvite(db, session.user, inviteId, parseToken(request.headers.get("x-invite-token")), parsed.value);
   switch (r.status) {
     case "joined":
       return json({ orgId: r.orgId });

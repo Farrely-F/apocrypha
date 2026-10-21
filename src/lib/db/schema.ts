@@ -255,6 +255,9 @@ export const invite = sqliteTable(
     email: text("email"),
     // `v1|<alg>|<key>` of the throwaway pair; its algorithm fixes the wrapped-key format.
     ephemeralPublicKey: text("ephemeral_public_key").notNull(),
+    // SHA-256 (hex) of a random secret that lives only in the link's #fragment. Knowing the
+    // invite id is not enough to redeem: the redeemer must also present the secret.
+    redeemHash: text("redeem_hash").notNull().default(""),
     expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
     usedAt: integer("used_at", { mode: "timestamp_ms" }),
     usedBy: text("used_by"),

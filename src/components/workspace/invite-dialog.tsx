@@ -64,7 +64,7 @@ export function InviteDialog({ org, open, onOpenChange }: { org: TreeOrg; open: 
       keys.forEach((k) => k.key.fill(0));
       const made = (await call(`/api/organizations/${org.id}/invites`, {
         method: "POST",
-        body: JSON.stringify({ email: values.email || undefined, ephemeralPublicKey: sealed.ephemeralPublicKey, grants: sealed.grants }),
+        body: JSON.stringify({ email: values.email || undefined, ephemeralPublicKey: sealed.ephemeralPublicKey, redeemHash: sealed.redeemHash, grants: sealed.grants }),
       })) as { inviteId: string };
       setLink(`${location.origin}/join/${made.inviteId}#${sealed.fragment}`);
       void load();

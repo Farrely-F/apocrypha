@@ -21,24 +21,25 @@ function grants(input: unknown, alg: Alg): Parsed<WrappedGrant[]> {
   return { ok: true, value: out };
 }
 
-export type NewInviteBody = { email: string | null; ephemeralPublicKey: string; grants: WrappedGrant[] };
+export type NewInviteBody = { email: string | null; ephemeralPublicKey: string; redeemHash: string; grants: WrappedGrant[] };
 
 export function parseNewInvite(input: unknown): Parsed<NewInviteBody> {
   if (typeof input !== "object" || input === null || Array.isArray(input)) return fail("Request body must be a JSON object.");
   const o = input as Record<string, unknown>;
-  if (Object.keys(o).some((k) => !["email", "ephemeralPublicKey", "grants"].includes(k))) return fail("Unexpected field.");
+  if (Object.keys(o).some((k) => !["email", "ephemeralPublicKey", "redeemHash", "grants"].includes(k))) return fail("Unexpected field.");
   const key = o.ephemeralPublicKey;
   const parts = typeof key === "string" ? key.split("|") : [];
   if (parts.length !== 3 || parts[0] !== "v1" || (parts[1] !== "x25519" && parts[1] !== "p256") || !B64U.test(parts[2]) || parts[2].length > 120) {
     return fail("ephemeralPublicKey must be a v1 public key.");
   }
+  if (typeof o.redeemHash !== "string" || !/^[0-9a-f]{64}$/.test(o.redeemHash)) return fail("redeemHash must be a SHA-256 hex digest.");
   let email: string | null = null;
   if (o.email !== undefined && o.email !== null && o.email !== "") {
     if (typeof o.email !== "string" || !EMAIL.test(o.email.trim())) return fail("email must be an email address.");
     email = o.email.trim().toLowerCase();
   }
   const g = grants(o.grants, parts[1]);
-  return g.ok ? { ok: true, value: { email, ephemeralPublicKey: key as string, grants: g.value } } : g;
+  return g.ok ? { ok: true, value: { email, ephemeralPublicKey: key as string, redeemHash: o.redeemHash, grants: g.value } } : g;
 }
 
 export function parseRedeem(input: unknown, alg: Alg): Parsed<WrappedGrant[]> {
@@ -47,3 +48,6 @@ export function parseRedeem(input: unknown, alg: Alg): Parsed<WrappedGrant[]> {
   if (Object.keys(o).some((k) => k !== "grants")) return fail("Unexpected field.");
   return grants(o.grants, alg);
 }
+
+/** The fragment secret as presented by the redeemer (header `x-invite-token`). */
+export const parseToken = (v: string | null) => (v && /^[A-Za-z0-9_-]{43}$/.test(v) ? v : "");

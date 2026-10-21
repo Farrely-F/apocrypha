@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { and, eq, gt, inArray, isNull } from "drizzle-orm";
 import type { LibSQLDatabase } from "drizzle-orm/libsql";
 import * as schema from "../db/schema";
@@ -7,6 +8,9 @@ type Db = LibSQLDatabase<typeof schema>;
 
 export const INVITE_TTL_MS = 48 * 60 * 60 * 1000;
 const BUILDERS: readonly OrgRole[] = ["owner", "admin"];
+
+/** Hash of the fragment secret, as stored. Empty secrets never match (the column default is empty). */
+export const hashRedeemToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
 export type WrappedGrant = { envId: string; wrappedKey: string };
 
@@ -32,7 +36,7 @@ export type CreateInviteResult =
 export async function createInvite(
   db: Db,
   userId: string,
-  input: { orgId: string; email: string | null; ephemeralPublicKey: string; grants: WrappedGrant[] },
+  input: { orgId: string; email: string | null; ephemeralPublicKey: string; redeemHash: string; grants: WrappedGrant[] },
   now = new Date(),
 ): Promise<CreateInviteResult> {
   const role = await roleIn(db, userId, input.orgId);
@@ -70,6 +74,7 @@ export async function createInvite(
       role: "member",
       email: input.email?.toLowerCase() ?? null,
       ephemeralPublicKey: input.ephemeralPublicKey,
+      redeemHash: input.redeemHash,
       expiresAt,
     });
     await tx.insert(schema.inviteGrant).values(
@@ -115,6 +120,7 @@ export async function getInviteOffer(
   db: Db,
   user: { id: string; email: string; emailVerified: boolean },
   inviteId: string,
+  token: string,
   now = new Date(),
 ): Promise<InviteOffer | null> {
   const [inv] = await db
@@ -126,9 +132,9 @@ export async function getInviteOffer(
     })
     .from(schema.invite)
     .innerJoin(schema.organization, eq(schema.organization.id, schema.invite.organizationId))
-    .where(and(eq(schema.invite.id, inviteId), isNull(schema.invite.usedAt), isNull(schema.invite.revokedAt), gt(schema.invite.expiresAt, now)))
+    .where(and(eq(schema.invite.id, inviteId), eq(schema.invite.redeemHash, hashRedeemToken(token)), isNull(schema.invite.usedAt), isNull(schema.invite.revokedAt), gt(schema.invite.expiresAt, now)))
     .limit(1);
-  if (!inv || !emailAllowed(inv.email, user)) return null;
+  if (!token || !inv || !emailAllowed(inv.email, user)) return null;
   const grants = await db
     .select({ envId: schema.inviteGrant.envId, keyVersion: schema.inviteGrant.keyVersion, wrappedKey: schema.inviteGrant.wrappedKey })
     .from(schema.inviteGrant)
@@ -151,10 +157,11 @@ export async function redeemInvite(
   db: Db,
   user: { id: string; email: string; emailVerified: boolean },
   inviteId: string,
+  token: string,
   rewrapped: WrappedGrant[],
   now = new Date(),
 ): Promise<RedeemResult> {
-  const offer = await getInviteOffer(db, user, inviteId, now);
+  const offer = await getInviteOffer(db, user, inviteId, token, now);
   if (!offer) return { status: "not-found" };
 
   const wanted = new Set(offer.grants.map((g) => g.envId));
