@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, ChevronsUpDown, Pencil, Plus, Trash2, UserPlus, Users } from "lucide-react";
+import { Check, ChevronsUpDown, Pencil, Plus, Trash2, ScrollText, UserPlus, Users } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -32,6 +32,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input";
 import { useVault } from "@/components/vault/vault-provider";
 import { MembersDialog } from "@/components/workspace/members-dialog";
+import { AuditSheet } from "@/components/workspace/audit-sheet";
 import { InviteDialog } from "@/components/workspace/invite-dialog";
 import { CommandPalette } from "@/components/workspace/command-palette";
 import { generateEnvironmentKey, wrapEnvironmentKey } from "@/lib/crypto";
@@ -72,6 +73,7 @@ export function WorkspaceNav({ tree }: { tree: TreeOrg[] }) {
   const [newOrg, setNewOrg] = useState(false);
   const [invite, setInvite] = useState(false);
   const [members, setMembers] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
   const pathname = usePathname();
   const where = parse(pathname);
   const org = tree.find((o) => o.id === where?.orgId) ?? null;
@@ -115,6 +117,9 @@ export function WorkspaceNav({ tree }: { tree: TreeOrg[] }) {
           <DropdownMenuItem onClick={() => setMembers(true)}>
             <Users /> Members
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setAuditOpen(true)}>
+            <ScrollText /> Audit log
+          </DropdownMenuItem>
           {canBuild && (
             <DropdownMenuItem onClick={() => setInvite(true)}>
               <UserPlus /> Invite to {org.name}
@@ -125,6 +130,7 @@ export function WorkspaceNav({ tree }: { tree: TreeOrg[] }) {
       <NewOrganizationDialog open={newOrg} onOpenChange={setNewOrg} />
       {canBuild && <InviteDialog org={org} open={invite} onOpenChange={setInvite} />}
       <MembersDialog org={org} open={members} onOpenChange={setMembers} />
+      <AuditSheet org={org} open={auditOpen} onOpenChange={setAuditOpen} />
       <span aria-hidden className="hidden text-bone-faint sm:inline">/</span>
 
       <DropdownMenu>

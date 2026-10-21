@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth/auth";
+import { audit } from "@/lib/audit/store";
 import { db } from "@/lib/db/client";
 import { readJsonLimited } from "@/lib/http/body";
 import { sameOrigin } from "@/lib/http/origin";
@@ -35,5 +36,6 @@ export async function POST(request: Request) {
     return json({ error: "A vault already exists for this account." }, 409);
   }
   const { orgId, projectId, envId } = result;
+  await audit(db, { orgId, actorId: session.user.id, type: "org.created", envId, data: { projectId, personal: true } });
   return json({ ok: true, orgId, projectId, envId }, 201);
 }
