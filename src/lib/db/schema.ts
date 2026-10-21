@@ -201,3 +201,39 @@ export const environmentKeyGrant = sqliteTable(
     index("environment_key_grant_principal_idx").on(table.principalType, table.principalId),
   ],
 );
+
+// A secret is a stable id in one environment; every edit is a new row in
+// secret_version (append-only). Names, values and metadata are ciphertext,
+// sealed in the browser with the environment key (docs/crypto.md section 4),
+// so the server can store and return them but never read them.
+export const secret = sqliteTable(
+  "secret",
+  {
+    // Generated in the browser: the encryption context binds it.
+    id: text("id").primaryKey(),
+    environmentId: text("environment_id")
+      .notNull()
+      .references(() => environment.id, { onDelete: "cascade" }),
+    createdBy: text("created_by").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [index("secret_environment_idx").on(table.environmentId)],
+);
+
+export const secretVersion = sqliteTable(
+  "secret_version",
+  {
+    secretId: text("secret_id")
+      .notNull()
+      .references(() => secret.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    // Which environment key version sealed this row.
+    keyVersion: integer("key_version").notNull(),
+    name: text("name").notNull(),
+    value: text("value").notNull(),
+    metadata: text("metadata"),
+    createdBy: text("created_by").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [primaryKey({ name: "secret_version_pk", columns: [table.secretId, table.version] })],
+);

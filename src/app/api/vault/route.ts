@@ -1,17 +1,10 @@
 import { auth } from "@/lib/auth/auth";
 import { db } from "@/lib/db/client";
+import { sameOrigin } from "@/lib/http/origin";
 import { parseVaultPayload } from "@/lib/vault/payload";
 import { createVaultRecord } from "@/lib/vault/store";
 
 const json = (body: unknown, status: number) => Response.json(body, { status });
-
-function sameOrigin(request: Request) {
-  const origin = request.headers.get("origin");
-  if (!origin) return true;
-  const allowed = new Set([new URL(request.url).origin]);
-  if (process.env.BETTER_AUTH_URL) allowed.add(new URL(process.env.BETTER_AUTH_URL).origin);
-  return allowed.has(origin);
-}
 
 /** Create the signed-in user's vault. Only public key material and wrapped blobs arrive here (vault blobs and the first environment grant); the server creates the personal workspace in the same transaction. */
 export async function POST(request: Request) {

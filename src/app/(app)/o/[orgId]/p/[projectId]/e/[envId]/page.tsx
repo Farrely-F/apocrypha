@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Divider, Pane } from "@/components/shell";
+import { SecretsPane } from "@/components/secrets/secrets-pane";
 import { StatusInfo } from "@/components/vault";
 import { requireSession } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
@@ -70,20 +71,11 @@ async function EnvironmentView({ params }: { params: Params }) {
           </p>
         </Pane>
 
-        <Pane title="Secrets" meta="0">
-          <p className="text-bone">No secrets yet</p>
-          <p className="mt-1 max-w-[60ch] text-bone-dim">
-            Anything you add here is encrypted in this browser with this
-            environment&apos;s key before it leaves it.
-          </p>
-          <p className="mt-6 text-bone-faint">
-            <span aria-hidden className="text-signal">
-              {"> "}
-            </span>
-            awaiting first secret
-            <span aria-hidden className="mora-caret ml-1" />
-          </p>
-        </Pane>
+        <SecretsPane
+          envId={view.envId}
+          keyVersion={view.currentKeyVersion}
+          canWrite={view.role === "owner" || view.role === "admin"}
+        />
       </div>
     </>
   );
