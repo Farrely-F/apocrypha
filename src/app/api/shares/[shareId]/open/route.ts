@@ -1,0 +1,20 @@
+import { db } from "@/lib/db/client";
+import { sameOrigin } from "@/lib/http/origin";
+import { openShare } from "@/lib/share/store";
+import { UUID } from "@/lib/vault/payload";
+import { json } from "@/lib/workspace/http";
+
+type Ctx = { params: Promise<{ shareId: string }> };
+
+/**
+ * Public: a guest with no account opens a link. This spends one view and returns the sealed
+ * envelope, which is useless without the key in the link's #fragment (and the password, if any).
+ * POST, not GET, so a page prefetch or an <img> cannot burn a view; the guest page sends it on a click.
+ */
+export async function POST(request: Request, { params }: Ctx) {
+  if (!sameOrigin(request)) return json({ error: "Cross-origin request refused." }, 403);
+  const { shareId } = await params;
+  const opened = UUID.test(shareId) ? await openShare(db, shareId.toLowerCase()) : null;
+  if (!opened) return json({ error: "This link is not available. It may have expired, been used up, or been revoked." }, 404);
+  return json({ ...opened, expiresAt: opened.expiresAt?.toISOString() ?? null });
+}

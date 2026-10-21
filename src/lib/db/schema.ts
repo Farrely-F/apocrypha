@@ -281,3 +281,30 @@ export const inviteGrant = sqliteTable(
   },
   (table) => [primaryKey({ name: "invite_grant_pk", columns: [table.inviteId, table.envId, table.keyVersion] })],
 );
+
+// A temporary link to a snapshot of an environment's secrets for someone with no account.
+// The server only ever holds the sealed envelope; the key lives in the link's #fragment.
+export const share = sqliteTable(
+  "share",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    envId: text("env_id")
+      .notNull()
+      .references(() => environment.id, { onDelete: "cascade" }),
+    createdBy: text("created_by").notNull(),
+    envelope: text("envelope").notNull(),
+    passwordProtected: integer("password_protected", { mode: "boolean" }).notNull(),
+    itemCount: integer("item_count").notNull(),
+    // At least one of these two limits is always set.
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
+    maxViews: integer("max_views"),
+    views: integer("views").notNull().default(0),
+    lastViewedAt: integer("last_viewed_at", { mode: "timestamp_ms" }),
+    revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
+    createdAt: createdAt(),
+  },
+  (table) => [index("share_organization_id_idx").on(table.organizationId), index("share_env_id_idx").on(table.envId)],
+);
