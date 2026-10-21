@@ -140,7 +140,7 @@ export async function exportAudit(db: Db, userId: string, orgId: string, now = n
   if (role !== "owner") return "forbidden";
   const [cp] = await db.select().from(schema.auditCheckpoint).where(eq(schema.auditCheckpoint.organizationId, orgId)).limit(1);
   const rows = await db.select().from(schema.auditEvent).where(eq(schema.auditEvent.organizationId, orgId)).orderBy(asc(schema.auditEvent.seq));
-  const events: ChainEntry[] = rows.map(({ id: _id, ...e }) => e);
+  const events: ChainEntry[] = rows.map((r) => ({ organizationId: r.organizationId, seq: r.seq, createdAt: r.createdAt, actorId: r.actorId, type: r.type, envId: r.envId, targetUserId: r.targetUserId, data: r.data, prevHash: r.prevHash, hash: r.hash }));
   const head = events.at(-1);
   return { orgId, exportedAt: now.toISOString(), headHash: head?.hash ?? cp?.hash ?? GENESIS, headSeq: head?.seq ?? cp?.seq ?? 0, count: events.length, prunedThrough: cp?.seq ?? 0, events };
 }

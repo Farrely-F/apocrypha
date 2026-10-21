@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/client";
 import { audit } from "@/lib/audit/store";
-import { orgOfEnv, orgOfProject } from "@/lib/audit/lookup";
+import { orgOfEnv } from "@/lib/audit/lookup";
 import { deleteEnvironment, renameEnvironment } from "@/lib/workspace/manage";
 import { guard, manageResponse, readName } from "@/lib/workspace/http";
 

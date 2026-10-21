@@ -1,7 +1,6 @@
 import { auth } from "@/lib/auth/auth";
 import { REAUTH_MESSAGE, signedInRecently } from "@/lib/auth/fresh";
 import { db } from "@/lib/db/client";
-import { audit } from "@/lib/audit/store";
 import { auditAccount } from "@/lib/audit/lookup";
 import { readJsonLimited } from "@/lib/http/body";
 import { sameOrigin } from "@/lib/http/origin";

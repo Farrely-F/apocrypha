@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth/auth";
 import { db } from "@/lib/db/client";
 import { audit } from "@/lib/audit/store";
-import { orgOfEnv, orgOfProject } from "@/lib/audit/lookup";
+import { orgOfEnv } from "@/lib/audit/lookup";
 import { noteEnvRead } from "@/lib/audit/store";
 import { readJsonLimited } from "@/lib/http/body";
 import { sameOrigin } from "@/lib/http/origin";

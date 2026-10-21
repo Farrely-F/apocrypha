@@ -23,5 +23,5 @@ export async function GET(request: Request, { params }: Ctx) {
   }
   // Only the people who can see the whole log are told whether the whole chain still verifies.
   const chain = result.scope === "org" ? await verifyOrgChain(db, orgId) : null;
-  return json({ scope: result.scope, chain, events: result.events.map(({ prevHash: _p, organizationId: _o, ...e }) => e) });
+  return json({ scope: result.scope, chain, events: result.events.map((e) => ({ id: e.id, seq: e.seq, createdAt: e.createdAt, type: e.type, actorId: e.actorId, actorName: e.actorName, envId: e.envId, envName: e.envName, targetUserId: e.targetUserId, targetName: e.targetName, data: e.data, hash: e.hash })) });
 }
