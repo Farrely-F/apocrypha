@@ -16,6 +16,7 @@ import { IDLE_TIMEOUT_MS, TRUST_TTL_MS } from "@/lib/vault/keystore";
 import { unlockSchema, type UnlockValues } from "@/lib/vault/schemas";
 import { lock as lockStore } from "@/lib/vault/unlocked";
 import { PassphraseInput } from "./passphrase-input";
+import { RecoveryForm } from "./recovery-form";
 import { useVault } from "./vault-provider";
 
 /** The one message for every failed unlock. It must not say which part was wrong. */
@@ -42,6 +43,7 @@ export function UnlockScreen({ email }: { email: string }) {
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   // Remounts the error so its flicker plays once per failed attempt.
   const [attempt, setAttempt] = useState(0);
+  const [recovering, setRecovering] = useState(false);
   const form = useForm<UnlockValues>({
     resolver: zodResolver(unlockSchema),
     defaultValues: { passphrase: "", trust: false },
@@ -122,6 +124,9 @@ export function UnlockScreen({ email }: { email: string }) {
         />
       </div>
 
+      {recovering && load.kind === "ready" ? (
+        <RecoveryForm email={email} me={load.me} onBack={() => setRecovering(false)} onUnlocked={(kp) => unlock(kp, { trusted: false })} />
+      ) : (
       <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="relative z-10 w-full max-w-md">
         <Pane title="Vault locked" meta={email} className="bg-background">
           <p className="text-bone-dim">
@@ -190,8 +195,14 @@ export function UnlockScreen({ email }: { email: string }) {
               Sign out
             </Button>
           </div>
+          <div className="mt-4">
+            <Button type="button" variant="link" size="sm" className="px-0" disabled={!ready || isSubmitting} onClick={() => setRecovering(true)}>
+              Forgot your passphrase? Use your recovery key
+            </Button>
+          </div>
         </Pane>
       </form>
+      )}
     </div>
   );
 }

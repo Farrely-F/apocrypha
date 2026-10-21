@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, Terminal } from "lucide-react";
+import { KeyRound, Lock, Terminal } from "lucide-react";
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
+import { ChangePassphraseDialog } from "@/components/vault/change-passphrase-dialog";
 import { useVault } from "@/components/vault/vault-provider";
 import { environmentPath } from "@/lib/workspace/shared";
 import type { TreeOrg } from "@/lib/workspace/manage";
@@ -12,6 +13,7 @@ import type { TreeOrg } from "@/lib/workspace/manage";
 /** Ctrl/Cmd+K: jump to any environment you can open, or lock the vault. */
 export function CommandPalette({ org }: { org: TreeOrg }) {
   const [open, setOpen] = useState(false);
+  const [passphrase, setPassphrase] = useState(false);
   const router = useRouter();
   const { lock } = useVault();
 
@@ -58,6 +60,15 @@ export function CommandPalette({ org }: { org: TreeOrg }) {
             <CommandSeparator />
             <CommandGroup heading="Vault">
               <CommandItem
+                value="change passphrase"
+                onSelect={() => {
+                  setOpen(false);
+                  setPassphrase(true);
+                }}
+              >
+                <KeyRound /> Change passphrase
+              </CommandItem>
+              <CommandItem
                 value="lock vault"
                 onSelect={() => {
                   setOpen(false);
@@ -70,6 +81,7 @@ export function CommandPalette({ org }: { org: TreeOrg }) {
           </CommandList>
         </Command>
       </CommandDialog>
+      <ChangePassphraseDialog open={passphrase} onOpenChange={setPassphrase} />
     </>
   );
 }
