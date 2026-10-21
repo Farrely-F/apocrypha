@@ -1,8 +1,19 @@
+import { Suspense } from "react";
 import { JoinScreen } from "./join-screen";
 
 export const metadata = { title: "Join an organisation", robots: { index: false }, referrer: "no-referrer" };
 
-export default async function JoinPage({ params }: { params: Promise<{ inviteId: string }> }) {
+type Params = Promise<{ inviteId: string }>;
+
+async function Screen({ params }: { params: Params }) {
   const { inviteId } = await params;
   return <JoinScreen inviteId={inviteId} />;
+}
+
+export default function JoinPage({ params }: { params: Params }) {
+  return (
+    <Suspense fallback={null}>
+      <Screen params={params} />
+    </Suspense>
+  );
 }

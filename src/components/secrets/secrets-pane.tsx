@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Copy, Download, Ellipsis, Eye, EyeOff, History, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import { Check, Copy, Download, Ellipsis, Eye, EyeOff, History, Link2, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { Pane } from "@/components/shell";
 import { useVault } from "@/components/vault";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -40,6 +40,7 @@ import { AddSecretForm } from "./add-secret-form";
 import { SecretEditor } from "./secret-editor";
 import { SecretHistory } from "./secret-history";
 import { SecretsImport } from "./secrets-import";
+import { ShareDialog } from "./share-dialog";
 import { download, type Item } from "./shared";
 
 const REVEAL_FOR_MS = 30_000;
@@ -97,11 +98,13 @@ function IconAction({
 export function SecretsPane({
   envId,
   envName,
+  orgId,
   keyVersion,
   canWrite,
   currentUserId,
 }: {
   envId: string;
+  orgId: string;
   envName: string;
   /** The environment's current key version: what new versions are sealed with. */
   keyVersion: number;
@@ -123,6 +126,7 @@ export function SecretsPane({
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [sharing, setSharing] = useState<Item[] | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const refresh = useCallback(
@@ -277,6 +281,12 @@ export function SecretsPane({
                   {copied === "sel" ? "Copied" : "Copy as .env"}
                 </Button>
                 {canWrite && (
+                  <Button size="sm" variant="outline" onClick={() => setSharing(pickedItems)}>
+                    <Link2 data-icon="inline-start" />
+                    Share link
+                  </Button>
+                )}
+                {canWrite && (
                   <Button size="sm" variant="destructive" onClick={() => setDeleting(pickedItems)}>
                     <Trash2 data-icon="inline-start" />
                     Delete
@@ -329,6 +339,10 @@ export function SecretsPane({
                   </DropdownMenu>
                   {canWrite && (
                     <>
+                      <Button size="sm" variant="outline" disabled={items.length === 0} onClick={() => setSharing(items)}>
+                        <Link2 data-icon="inline-start" />
+                        Share
+                      </Button>
                       <Button size="sm" variant="outline" onClick={() => setImporting(true)}>
                         <Upload data-icon="inline-start" />
                         Import
@@ -521,6 +535,17 @@ export function SecretsPane({
           </DialogContent>
         </Dialog>
 
+        {sharing && (
+          <ShareDialog
+            open
+            onOpenChange={(o) => !o && setSharing(null)}
+            items={sharing}
+            scope={sharing.length === items.length ? `all ${items.length} secrets` : `${sharing.length} selected secret${sharing.length === 1 ? "" : "s"}`}
+            envId={envId}
+            envName={envName}
+            orgId={orgId}
+          />
+        )}
         <Sheet open={historyOf !== null} onOpenChange={(o) => !o && setHistoryOf(null)}>
           <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-3xl">
             <SheetHeader>

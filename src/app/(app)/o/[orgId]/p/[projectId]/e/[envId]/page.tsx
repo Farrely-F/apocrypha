@@ -61,6 +61,7 @@ async function EnvironmentView({ params }: { params: Params }) {
         <SecretsPane
           envId={view.envId}
           envName={view.environmentName}
+          orgId={view.orgId}
           currentUserId={user.id}
           keyVersion={view.currentKeyVersion}
           canWrite={view.role === "owner" || view.role === "admin"}
