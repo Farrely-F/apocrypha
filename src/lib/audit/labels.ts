@@ -43,6 +43,8 @@ export function describeEvent(e: { type: string; actorName: string | null; envNa
       return `removed ${target}${typeof d.rotatedEnvironments === "number" ? `, rotating ${d.rotatedEnvironments} environment key${d.rotatedEnvironments === 1 ? "" : "s"}` : ""}`;
     case "member.role_changed":
       return `made ${target} ${String(d.role ?? "a different role")}`;
+    case "member.access_changed":
+      return `set ${target}'s access${e.envName ? ` to ${e.envName}` : ""} to ${String(d.to ?? "a new level")}${d.rotated ? " and rotated the key" : ""}`;
     case "member.regranted":
       return `restored ${target}'s access after a vault reset`;
     case "member.vault_reset":

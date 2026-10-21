@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, UserMinus } from "lucide-react";
+import { ShieldCheck, SlidersHorizontal, UserMinus } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useVault } from "@/components/vault/vault-provider";
+import { AccessDialog } from "@/components/workspace/access-dialog";
 import { acceptKeys, checkPins } from "@/lib/members/pins";
 import { generateEnvironmentKey, wrapEnvironmentKey } from "@/lib/crypto";
 import { fetchEnvironmentKeys, fetchSecrets } from "@/lib/secrets/client";
@@ -61,6 +62,7 @@ export function MembersDialog({ org, open, onOpenChange }: { org: TreeOrg; open:
   const [changed, setChanged] = useState<string[]>([]);
   const [needsAccess, setNeedsAccess] = useState<string[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
+  const [accessFor, setAccessFor] = useState<Member | null>(null);
   const [done, setDone] = useState<{ who: string; exposed: Exposed } | null>(null);
   const myRole = members.find((m) => m.userId === me)?.role;
 
@@ -261,7 +263,7 @@ export function MembersDialog({ org, open, onOpenChange }: { org: TreeOrg; open:
                   <TableHead>Person</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Key fingerprint</TableHead>
-                  <TableHead className="w-24" />
+                  <TableHead className="w-32" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -294,6 +296,14 @@ export function MembersDialog({ org, open, onOpenChange }: { org: TreeOrg; open:
                     <TableCell className="font-mono text-xs text-bone-faint">{prints[m.userId] ?? "..."}</TableCell>
                     <TableCell>
                       <span className="flex justify-end gap-1">
+                      {m.role === "member" && m.userId !== me && (myRole === "owner" || myRole === "admin") && (
+                        <Tooltip>
+                          <TooltipTrigger render={<Button variant="ghost" size="icon-sm" disabled={busy} aria-label={`Environment access for ${m.name}`} onClick={() => setAccessFor(m)} />}>
+                            <SlidersHorizontal />
+                          </TooltipTrigger>
+                          <TooltipContent>Environment access</TooltipContent>
+                        </Tooltip>
+                      )}
                       {needsAccess.includes(m.userId) && (
                         <Tooltip>
                           <TooltipTrigger render={<Button variant="ghost" size="icon-sm" disabled={busy} aria-label={`Re-grant access to ${m.name}`} onClick={() => void regrant(m)} />}>
@@ -319,6 +329,8 @@ export function MembersDialog({ org, open, onOpenChange }: { org: TreeOrg; open:
           )}
         </DialogContent>
       </Dialog>
+
+      {accessFor && <AccessDialog orgId={org.id} member={accessFor} people={members} changed={changed} onClose={() => setAccessFor(null)} />}
 
       <AlertDialog open={!!removing} onOpenChange={(o) => !o && !busy && setRemoving(null)}>
         <AlertDialogContent>
