@@ -308,3 +308,20 @@ export const share = sqliteTable(
   },
   (table) => [index("share_organization_id_idx").on(table.organizationId), index("share_env_id_idx").on(table.envId)],
 );
+
+// After someone resets their vault to a new key pair, their old environment grants are useless.
+// They are deleted and these rows record which environments an admin should re-share with them.
+// Per environment, not per version: whatever versions the admin holds at that time are granted.
+export const regrantRequest = sqliteTable(
+  "regrant_request",
+  {
+    envId: text("env_id")
+      .notNull()
+      .references(() => environment.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (table) => [primaryKey({ name: "regrant_request_pk", columns: [table.envId, table.userId] })],
+);

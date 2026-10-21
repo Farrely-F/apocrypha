@@ -1,4 +1,5 @@
 import { db } from "@/lib/db/client";
+import { pendingRegrants } from "@/lib/members/regrant";
 import { listMembers } from "@/lib/members/store";
 import { guard, json } from "@/lib/workspace/http";
 
@@ -9,5 +10,7 @@ export async function GET(request: Request, { params }: Ctx) {
   if (who instanceof Response) return who;
   const { orgId } = await params;
   const members = await listMembers(db, who.userId, orgId);
-  return members ? json({ members, me: who.userId }) : json({ error: "Not found." }, 404);
+  if (!members) return json({ error: "Not found." }, 404);
+  // Owners and admins also learn who is waiting for access after resetting their vault.
+  return json({ members, me: who.userId, needsAccess: (await pendingRegrants(db, who.userId, orgId)) ?? [] });
 }

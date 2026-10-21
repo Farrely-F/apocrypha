@@ -193,6 +193,9 @@ export async function removeMember(db: Db, actorId: string, orgId: string, targe
             carrying ? or(eq(schema.invite.createdBy, targetId), inArray(schema.invite.id, carrying)) : eq(schema.invite.createdBy, targetId),
           ),
         );
+      await tx
+        .delete(schema.regrantRequest)
+        .where(and(eq(schema.regrantRequest.userId, targetId), inArray(schema.regrantRequest.envId, orgEnvs)));
       await tx.delete(schema.member).where(and(eq(schema.member.organizationId, orgId), eq(schema.member.userId, targetId)));
     });
   } catch (e) {
