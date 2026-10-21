@@ -650,7 +650,9 @@ const Dither = ({
       gl.deleteVertexArray(vao);
       gl.deleteTexture(field);
       gl.deleteFramebuffer(framebuffer);
-      gl.getExtension('WEBGL_lose_context')?.loseContext();
+      // Dev StrictMode re-runs this effect on the same canvas; losing the context
+      // while it is still attached would leave that canvas permanently blank.
+      if (!gl.canvas.isConnected) gl.getExtension('WEBGL_lose_context')?.loseContext();
     };
   }, []);
 
