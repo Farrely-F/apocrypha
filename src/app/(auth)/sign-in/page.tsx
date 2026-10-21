@@ -22,6 +22,9 @@ async function Gate({ searchParams }: { searchParams: Promise<{ error?: string |
   );
 }
 
+// Reads the session (and redirects on it), so it cannot be prerendered into the static shell.
+export const instant = false;
+
 export default function SignInPage({ searchParams }: { searchParams: Promise<{ error?: string | string[] }> }) {
   return (
     <div className="flex min-h-dvh flex-col bg-background">

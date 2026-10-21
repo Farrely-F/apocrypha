@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useVault } from "@/components/vault/vault-provider";
+import { acceptKeys, checkPins } from "@/lib/members/pins";
 import { generateEnvironmentKey, wrapEnvironmentKey } from "@/lib/crypto";
 import { fetchEnvironmentKeys, fetchSecrets } from "@/lib/secrets/client";
 import { openSecret } from "@/lib/secrets/seal";
@@ -57,6 +58,7 @@ export function MembersDialog({ org, open, onOpenChange }: { org: TreeOrg; open:
   const [error, setError] = useState<string | null>(null);
   const [removing, setRemoving] = useState<Member | null>(null);
   const [busy, setBusy] = useState(false);
+  const [changed, setChanged] = useState<string[]>([]);
   const [done, setDone] = useState<{ who: string; exposed: Exposed } | null>(null);
   const myRole = members.find((m) => m.userId === me)?.role;
 
@@ -65,6 +67,7 @@ export function MembersDialog({ org, open, onOpenChange }: { org: TreeOrg; open:
       const data = await call<{ members: Member[]; me: string }>(`/api/organizations/${org.id}/members`);
       setMembers(data.members);
       setMe(data.me);
+      setChanged(checkPins(org.id, data.members));
       const next: Record<string, string> = {};
       for (const m of data.members) if (m.publicKey) next[m.userId] = await fingerprint(m.publicKey);
       setPrints(next);
@@ -98,6 +101,16 @@ export function MembersDialog({ org, open, onOpenChange }: { org: TreeOrg; open:
     setError(null);
     try {
       const { environments } = await call<Plan>(`/api/organizations/${org.id}/members/${m.userId}/removal`);
+      // The server names who gets the new key. Refuse anyone who is not a listed member, is the
+      // person being removed, or whose key differs from the one listed and pinned for them.
+      const listed = new Map(members.map((x) => [x.userId, x.publicKey]));
+      for (const env of environments) {
+        for (const r of env.recipients) {
+          if (r.userId === m.userId || listed.get(r.userId) !== r.publicKey || changed.includes(r.userId)) {
+            throw new Error("A recipient's key does not match what you were shown. Nothing was changed. Check the fingerprints and reload.");
+          }
+        }
+      }
       const exposed: Exposed = [];
       for (const env of environments) {
         const keys = await fetchEnvironmentKeys(env.envId, keyPair);
@@ -141,6 +154,18 @@ export function MembersDialog({ org, open, onOpenChange }: { org: TreeOrg; open:
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          {changed.length > 0 && (
+            <Alert variant="destructive">
+              <AlertDescription className="grid gap-2">
+                <span>
+                  The key changed since you last saw it for {changed.map((id) => members.find((x) => x.userId === id)?.name ?? id).join(", ")}. Confirm the new fingerprint with them before removing anyone or sharing keys.
+                </span>
+                <Button size="sm" variant="outline" className="w-fit" onClick={() => { acceptKeys(org.id, members); setChanged([]); }}>
+                  I verified it, accept the new key
+                </Button>
+              </AlertDescription>
             </Alert>
           )}
           {done ? (

@@ -19,6 +19,9 @@ async function Gate() {
   );
 }
 
+// Reads the session (and redirects on it), so it cannot be prerendered into the static shell.
+export const instant = false;
+
 export default function NewVaultPage() {
   return (
     <Suspense fallback={null}>
