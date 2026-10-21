@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth/auth";
+import { REAUTH_MESSAGE, signedInRecently } from "@/lib/auth/fresh";
 import { db } from "@/lib/db/client";
 import { readJsonLimited } from "@/lib/http/body";
 import { sameOrigin } from "@/lib/http/origin";
@@ -12,6 +13,8 @@ export async function PUT(request: Request) {
   if (!sameOrigin(request)) return json({ error: "Cross-origin request refused." }, 403);
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) return json({ error: "Sign in first." }, 401);
+  // Replacing the blob can lock the owner out, so a session cookie alone is not enough.
+  if (!signedInRecently(session.session)) return json({ error: REAUTH_MESSAGE, code: "reauth" }, 403);
   const vault = await getVaultRecord(db, session.user.id);
   if (!vault) return json({ error: "No vault for this account." }, 404);
 
