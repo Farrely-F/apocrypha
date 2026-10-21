@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { generateEnvironmentKey } from "../crypto";
-import { parseCreateSecret } from "./payload";
-import { openSecret, sealNewSecret, type SecretRow } from "./seal";
+import { parseCreateSecret, parseNewVersion } from "./payload";
+import { openHistory, openSecret, sealNewSecret, sealVersion, type SecretRow, type VersionRow } from "./seal";
 
 const envId = crypto.randomUUID();
 let key1: Uint8Array;
@@ -27,7 +27,7 @@ describe("sealNewSecret / openSecret", () => {
     const body = await sealNewSecret(key1, envId, 1, "PRIVATE_KEY", value);
     const row: SecretRow = { id: body.secretId, version: 1, keyVersion: 1, name: body.name, value: body.value, metadata: null, createdAt: 0 };
     const opened = await openSecret(new Map([[1, key1]]), envId, row);
-    expect(opened).toEqual({ ok: true, id: body.secretId, version: 1, name: "PRIVATE_KEY", value });
+    expect(opened).toMatchObject({ ok: true, id: body.secretId, version: 1, name: "PRIVATE_KEY", value });
   });
 
   it("reports (does not throw) when it cannot decrypt", async () => {
@@ -45,5 +45,46 @@ describe("sealNewSecret / openSecret", () => {
     const b = await sealNewSecret(key1, envId, 1, "A", "b");
     expect(a.secretId).not.toBe(b.secretId);
     expect(a.value).not.toBe(b.value);
+  });
+});
+
+describe("sealVersion / openHistory", () => {
+  const secretId = crypto.randomUUID();
+  const asRow = (v: number, b: Awaited<ReturnType<typeof sealVersion>>, deleted = false): VersionRow => ({
+    version: v, keyVersion: b.keyVersion, name: b.name, value: b.value, metadata: b.metadata, deleted,
+    createdBy: "u", createdByName: "U", createdAt: v * 1000,
+  });
+
+  it("seals the next version on top of the one being edited", async () => {
+    const b = await sealVersion(key1, envId, secretId, 3, 1, "NAME", "new value");
+    expect(b.baseVersion).toBe(2);
+    expect(b.deleted).toBe(false);
+    expect(parseNewVersion(b).ok).toBe(true);
+    expect(JSON.stringify(b)).not.toContain("new value");
+  });
+
+  it("is bound to its version: moving a sealed body to another version fails to open", async () => {
+    const b = await sealVersion(key1, envId, secretId, 2, 1, "NAME", "v");
+    const keys = new Map([[1, key1]]);
+    expect((await openHistory(keys, envId, secretId, [asRow(2, b)]))[0].ok).toBe(true);
+    expect((await openHistory(keys, envId, secretId, [asRow(3, b)]))[0].ok).toBe(false);
+  });
+
+  it("opens a whole history, flags tombstones, and survives one unreadable row", async () => {
+    const v1 = await sealVersion(key1, envId, secretId, 1, 1, "A", "one");
+    const v2 = await sealVersion(key1, envId, secretId, 2, 1, "A", "two");
+    const v3 = await sealVersion(key1, envId, secretId, 3, 1, "A", "", true);
+    const keys = new Map([[1, key1]]);
+    const h = await openHistory(keys, envId, secretId, [asRow(1, v1), asRow(2, v2), asRow(3, v3, true)]);
+    expect(h.map((x) => (x.ok ? [x.version, x.value, x.deleted] : "bad"))).toEqual([[1, "one", false], [2, "two", false], [3, "", true]]);
+    const broken = await openHistory(keys, envId, secretId, [asRow(1, v1), { ...asRow(2, v2), value: "v1|a256gcm|AAAA|BBBB" }]);
+    expect(broken[0].ok).toBe(true);
+    expect(broken[1].ok).toBe(false);
+  });
+
+  it("a delete tombstone still seals an empty value", async () => {
+    const b = await sealVersion(key1, envId, secretId, 2, 1, "GONE", "", true);
+    expect(b.deleted).toBe(true);
+    expect(parseNewVersion(b).ok).toBe(true);
   });
 });

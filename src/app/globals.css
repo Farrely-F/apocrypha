@@ -67,7 +67,9 @@
     Consolas, monospace;
   --font-display: var(--font-display-face), "Iowan Old Style", "Palatino Linotype",
     Georgia, serif;
-  --font-heading: var(--font-display);
+  /* shadcn headings (dialog and sheet titles) stay mono: blackletter is only
+     readable large. Pane titles and the wordmark ask for font-display directly. */
+  --font-heading: var(--font-sans);
 
   /* Shape: square. Every radius step resolves to 0. */
   --radius-xs: 0;

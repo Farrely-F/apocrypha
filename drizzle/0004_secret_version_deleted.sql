@@ -1,0 +1,1 @@
+ALTER TABLE `secret_version` ADD `deleted` integer DEFAULT false NOT NULL;

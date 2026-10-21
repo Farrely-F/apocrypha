@@ -40,7 +40,7 @@ async function EnvironmentView({ params }: { params: Params }) {
       />
       <ol
         aria-label="Location"
-        className="mx-auto flex max-w-5xl min-w-0 items-center gap-2 whitespace-nowrap text-sm"
+        className="mx-auto flex max-w-7xl min-w-0 items-center gap-2 whitespace-nowrap text-sm"
       >
         <li className="truncate text-bone-dim">{view.orgName}</li>
         <li aria-hidden className={crumb}>
@@ -54,7 +54,7 @@ async function EnvironmentView({ params }: { params: Params }) {
           {view.environmentName}
         </li>
       </ol>
-      <div className="mx-auto grid max-w-5xl gap-8 pt-6 lg:grid-cols-[20rem_1fr]">
+      <div className="mx-auto grid max-w-7xl gap-8 pt-6 lg:grid-cols-[20rem_1fr]">
         <Pane title="Environment">
           <dl>
             <Fact label="org">{view.orgName}</Fact>
@@ -73,6 +73,8 @@ async function EnvironmentView({ params }: { params: Params }) {
 
         <SecretsPane
           envId={view.envId}
+          envName={view.environmentName}
+          currentUserId={user.id}
           keyVersion={view.currentKeyVersion}
           canWrite={view.role === "owner" || view.role === "admin"}
         />

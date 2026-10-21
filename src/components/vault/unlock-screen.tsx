@@ -1,18 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Controller, useForm } from "react-hook-form";
 import FaultyTerminal from "@/components/FaultyTerminal";
 import { Pane } from "@/components/shell";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { authClient } from "@/lib/auth/client";
 import { CryptoError, unlockVault } from "@/lib/crypto";
 import { IDLE_TIMEOUT_MS, TRUST_TTL_MS } from "@/lib/vault/keystore";
+import { unlockSchema, type UnlockValues } from "@/lib/vault/schemas";
 import { lock as lockStore } from "@/lib/vault/unlocked";
+import { PassphraseInput } from "./passphrase-input";
 import { useVault } from "./vault-provider";
-
-const field =
-  "w-full border border-hairline bg-pane px-3 py-2 text-bone placeholder:text-bone-faint focus:border-signal focus:outline-none";
 
 /** The one message for every failed unlock. It must not say which part was wrong. */
 const WRONG = "Incorrect passphrase or damaged vault.";
@@ -36,14 +40,13 @@ export function UnlockScreen({ email }: { email: string }) {
   const router = useRouter();
   const { unlock } = useVault();
   const [load, setLoad] = useState<Load>({ kind: "loading" });
-  const [passphrase, setPassphrase] = useState("");
-  const [show, setShow] = useState(false);
-  const [trust, setTrust] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // Remounts the error line so its flicker plays once per failed attempt.
+  // Remounts the error so its flicker plays once per failed attempt.
   const [attempt, setAttempt] = useState(0);
-  const input = useRef<HTMLInputElement>(null);
+  const form = useForm<UnlockValues>({
+    resolver: zodResolver(unlockSchema),
+    defaultValues: { passphrase: "", trust: false },
+  });
+  const { isSubmitting } = form.formState;
 
   useEffect(() => {
     let live = true;
@@ -63,33 +66,32 @@ export function UnlockScreen({ email }: { email: string }) {
   }, [router]);
 
   const ready = load.kind === "ready";
-  // Focus once the form is usable, and again after each failed attempt.
+  // Focus once the form is usable.
   useEffect(() => {
-    if (ready && !busy) input.current?.focus();
-  }, [ready, busy]);
+    if (ready) form.setFocus("passphrase");
+  }, [ready, form]);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (load.kind !== "ready" || busy || !passphrase) return;
-    setError(null);
-    setBusy(true);
+  async function onSubmit(values: UnlockValues) {
+    if (load.kind !== "ready") return;
     // Let "Unlocking" paint before Argon2id occupies the main thread.
     await new Promise((r) => setTimeout(r, 40));
     try {
-      const keyPair = await unlockVault(load.me.passphraseBlob, passphrase);
+      const keyPair = await unlockVault(load.me.passphraseBlob, values.passphrase);
       // The unlocked key must be the one the server holds the public half of.
       if (keyPair.publicKey !== load.me.publicKey) throw new CryptoError("decryption-failed", "mismatch");
-      await unlock(keyPair, { trusted: trust });
-      setPassphrase("");
+      await unlock(keyPair, { trusted: values.trust });
+      form.resetField("passphrase");
     } catch (err) {
-      setPassphrase("");
       setAttempt((n) => n + 1);
-      setError(
-        err instanceof CryptoError
-          ? WRONG
-          : "This browser could not store the unlocked key. Check that site storage is not blocked, then try again.",
-      );
-      setBusy(false);
+      form.setValue("passphrase", "");
+      form.setError("passphrase", {
+        type: "server",
+        message:
+          err instanceof CryptoError
+            ? WRONG
+            : "This browser could not store the unlocked key. Check that site storage is not blocked, then try again.",
+      });
+      form.setFocus("passphrase");
     }
   }
 
@@ -120,81 +122,69 @@ export function UnlockScreen({ email }: { email: string }) {
         />
       </div>
 
-      <form onSubmit={submit} noValidate className="relative z-10 w-full max-w-md">
+      <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="relative z-10 w-full max-w-md">
         <Pane title="Vault locked" meta={email} className="bg-background">
           <p className="text-bone-dim">
             Enter your vault passphrase. It opens a key that stays in this
             browser and never leaves it.
           </p>
 
-          <div className="mt-5">
-            <label htmlFor="unlock-passphrase" className="text-bone">
-              Vault passphrase
-            </label>
-            <div className="mt-2 flex gap-2">
-              <input
-                ref={input}
-                id="unlock-passphrase"
-                name="passphrase"
-                type={show ? "text" : "password"}
-                value={passphrase}
-                onChange={(e) => setPassphrase(e.target.value)}
-                autoComplete="current-password"
-                spellCheck={false}
-                disabled={!ready || busy}
-                aria-invalid={error === WRONG}
-                aria-describedby="unlock-status"
-                className={field}
-              />
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => setShow((s) => !s)}
-                aria-pressed={show}
-                className="h-auto"
-              >
-                {show ? "Hide" : "Show"}
-              </Button>
-            </div>
-          </div>
-
-          <label className="mt-5 flex cursor-pointer items-start gap-3 text-bone-dim">
-            <input
-              type="checkbox"
-              checked={trust}
-              onChange={(e) => setTrust(e.target.checked)}
-              className="peer sr-only"
+          <FieldGroup className="mt-5">
+            <Controller
+              name="passphrase"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="unlock-passphrase">Vault passphrase</FieldLabel>
+                  <PassphraseInput
+                    {...field}
+                    id="unlock-passphrase"
+                    autoComplete="current-password"
+                    disabled={!ready || isSubmitting}
+                    aria-invalid={fieldState.invalid}
+                  />
+                  {fieldState.invalid && (
+                    <div key={attempt} className="mora-flicker">
+                      <FieldError errors={[fieldState.error]} />
+                    </div>
+                  )}
+                </Field>
+              )}
             />
-            <span
-              aria-hidden
-              className="shrink-0 whitespace-pre text-bone-faint after:content-['[_]'] peer-checked:text-signal peer-checked:after:content-['[x]'] peer-focus-visible:outline peer-focus-visible:outline-1 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-signal"
+
+            <Controller
+              name="trust"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field orientation="horizontal" data-invalid={fieldState.invalid}>
+                  <Checkbox
+                    id="unlock-trust"
+                    name={field.name}
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                    aria-invalid={fieldState.invalid}
+                  />
+                  <FieldContent>
+                    <FieldLabel htmlFor="unlock-trust">Trust this device for {trustDays} days</FieldLabel>
+                    <FieldDescription>
+                      Turns off the {idleLabel} idle lock. Anyone using this browser can open the vault until it
+                      expires or you lock it.
+                    </FieldDescription>
+                  </FieldContent>
+                </Field>
+              )}
             />
-            <span>
-              <span className="text-bone">Trust this device for {trustDays} days</span>
-              <span className="mt-1 block text-xs text-bone-faint">
-                Turns off the {idleLabel} idle lock. Anyone using this browser
-                can open the vault until it expires or you lock it.
-              </span>
-            </span>
-          </label>
+          </FieldGroup>
 
-          <div id="unlock-status" className="mt-3 min-h-5">
-            {error && (
-              <p key={attempt} role="alert" className="mora-flicker text-blood-bright">
-                {error}
-              </p>
-            )}
-            {load.kind === "error" && !error && (
-              <p role="alert" className="text-blood-bright">
-                Could not reach the server. Reload to try again.
-              </p>
-            )}
-          </div>
+          {load.kind === "error" && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertDescription>Could not reach the server. Reload to try again.</AlertDescription>
+            </Alert>
+          )}
 
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <Button type="submit" disabled={!ready || busy || !passphrase}>
-              {busy ? "Unlocking, this takes a moment" : "Unlock"}
+          <div className="mt-6 flex items-center justify-between gap-3">
+            <Button type="submit" disabled={!ready || isSubmitting}>
+              {isSubmitting ? "Unlocking, this takes a moment" : "Unlock"}
             </Button>
             <Button type="button" variant="ghost" size="sm" onClick={signOut}>
               Sign out

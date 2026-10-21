@@ -232,6 +232,8 @@ export const secretVersion = sqliteTable(
     name: text("name").notNull(),
     value: text("value").notNull(),
     metadata: text("metadata"),
+    // A delete is a new version with this set; history keeps everything before it.
+    deleted: integer("deleted", { mode: "boolean" }).notNull().default(false),
     createdBy: text("created_by").notNull(),
     createdAt: createdAt(),
   },

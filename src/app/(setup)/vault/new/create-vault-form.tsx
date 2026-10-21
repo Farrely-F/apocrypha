@@ -1,17 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { Pane } from "@/components/shell";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import { PassphraseInput } from "@/components/vault/passphrase-input";
 import {
   createVault,
   generateEnvironmentKey,
   wrapEnvironmentKey,
   type CreatedVault,
 } from "@/lib/crypto";
-import { setUnlockedKeyPair } from "@/lib/vault/unlocked";
+import {
+  createVaultSchema,
+  recoveryConfirmSchema,
+  type CreateVaultValues,
+  type RecoveryConfirmValues,
+} from "@/lib/vault/schemas";
 import { passphraseStrength, type StrengthLevel } from "@/lib/vault/strength";
+import { setUnlockedKeyPair } from "@/lib/vault/unlocked";
 import {
   DEFAULT_WORKSPACE_NAMES,
   FIRST_KEY_VERSION,
@@ -19,72 +32,153 @@ import {
   type WorkspaceIds,
 } from "@/lib/workspace/shared";
 
-const field =
-  "w-full border border-hairline bg-pane px-3 py-2 text-bone placeholder:text-bone-faint focus:border-signal focus:outline-none";
-
-const levelFill: Record<StrengthLevel, number> = { short: 0, weak: 1, fair: 3, strong: 4 };
-const levelColor: Record<StrengthLevel, string> = {
-  short: "bg-blood",
-  weak: "bg-blood",
-  fair: "bg-signal-dim",
-  strong: "bg-signal",
+const meter: Record<StrengthLevel, { value: number; color: string }> = {
+  short: { value: 0, color: "[&_[data-slot=progress-indicator]]:bg-blood" },
+  weak: { value: 25, color: "[&_[data-slot=progress-indicator]]:bg-blood" },
+  fair: { value: 75, color: "[&_[data-slot=progress-indicator]]:bg-signal-dim" },
+  strong: { value: 100, color: "[&_[data-slot=progress-indicator]]:bg-signal" },
 };
 
-type Step = "passphrase" | "sealing" | "recovery" | "saving";
-
-/** Letters and digits only, lower-cased, so dashes and spacing never matter. */
-const squash = (s: string) => s.replace(/[^A-Za-z0-9]/g, "").toLowerCase();
-
 export function CreateVaultForm({ email }: { email: string }) {
-  const router = useRouter();
-  const [step, setStep] = useState<Step>("passphrase");
-  const [passphrase, setPassphrase] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [show, setShow] = useState(false);
   const [vault, setVault] = useState<CreatedVault | null>(null);
-  const [typed, setTyped] = useState("");
-  const [copied, setCopied] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="mx-auto flex max-w-2xl flex-col gap-8 pt-6">
+      {vault ? (
+        <RecoveryStep email={email} vault={vault} onDiscard={() => setVault(null)} />
+      ) : (
+        <PassphraseStep email={email} onSealed={setVault} />
+      )}
+    </div>
+  );
+}
 
+function PassphraseStep({ email, onSealed }: { email: string; onSealed: (v: CreatedVault) => void }) {
+  const form = useForm<CreateVaultValues>({
+    resolver: zodResolver(createVaultSchema),
+    defaultValues: { passphrase: "", confirm: "" },
+    mode: "onChange",
+  });
+  const { isSubmitting, errors } = form.formState;
+  const passphrase = useWatch({ control: form.control, name: "passphrase" });
   const strength = passphraseStrength(passphrase);
-  const matches = passphrase.length > 0 && passphrase === confirm;
-  const canSeal = strength.ok && matches && step === "passphrase";
 
-  const tail = vault ? squash(vault.recoveryKey).slice(-4) : "";
-  const confirmed = vault !== null && squash(typed) === tail;
-
-  async function seal(e: React.FormEvent) {
-    e.preventDefault();
-    if (!canSeal) return;
-    setError(null);
-    setStep("sealing");
+  async function onSubmit(values: CreateVaultValues) {
     // Let "Sealing" paint before Argon2id occupies the main thread.
     await new Promise((r) => setTimeout(r, 40));
     try {
-      const created = await createVault(passphrase);
-      setVault(created);
-      // The passphrase is not needed again; drop it from component state.
-      setPassphrase("");
-      setConfirm("");
-      setStep("recovery");
+      const created = await createVault(values.passphrase);
+      // The passphrase is not needed again; drop it from form state.
+      form.reset({ passphrase: "", confirm: "" });
+      onSealed(created);
     } catch {
-      setError("This browser could not create the keys. Try a current Chrome, Firefox or Safari.");
-      setStep("passphrase");
+      form.setError("root.server", {
+        message: "This browser could not create the keys. Try a current Chrome, Firefox or Safari.",
+      });
     }
   }
 
+  return (
+    <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
+      <Pane title="Create your vault" meta={email}>
+        <p className="max-w-[60ch] text-bone-dim">
+          Your passphrase locks a key that only this browser holds. We store the locked key and never the passphrase,
+          so we can&apos;t reset it. You&apos;ll enter it on every new device.
+        </p>
+
+        <FieldGroup className="mt-6">
+          <Controller
+            name="passphrase"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor="passphrase">Vault passphrase</FieldLabel>
+                <PassphraseInput
+                  {...field}
+                  id="passphrase"
+                  autoComplete="new-password"
+                  aria-invalid={fieldState.invalid}
+                  disabled={isSubmitting}
+                />
+                <Progress
+                  aria-label="Passphrase strength"
+                  value={passphrase ? meter[strength.level].value : 0}
+                  className={meter[strength.level].color}
+                />
+                {fieldState.invalid ? (
+                  <FieldError errors={[fieldState.error]} />
+                ) : (
+                  <FieldDescription>
+                    {passphrase ? strength.hint : "At least 12 characters. Four random words works well."}
+                  </FieldDescription>
+                )}
+              </Field>
+            )}
+          />
+
+          <Controller
+            name="confirm"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor="confirm">Confirm passphrase</FieldLabel>
+                <PassphraseInput
+                  {...field}
+                  id="confirm"
+                  autoComplete="new-password"
+                  aria-invalid={fieldState.invalid}
+                  disabled={isSubmitting}
+                />
+                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+              </Field>
+            )}
+          />
+        </FieldGroup>
+
+        {errors.root?.server && (
+          <Alert variant="destructive" className="mt-4">
+            <AlertDescription>{errors.root.server.message}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="mt-6">
+          <Button type="submit" disabled={isSubmitting || !passphrase}>
+            {isSubmitting ? "Sealing, this takes a moment" : "Seal vault"}
+          </Button>
+        </div>
+      </Pane>
+    </form>
+  );
+}
+
+function RecoveryStep({
+  email,
+  vault,
+  onDiscard,
+}: {
+  email: string;
+  vault: CreatedVault;
+  onDiscard: () => void;
+}) {
+  const router = useRouter();
+  const [copied, setCopied] = useState(false);
+  const schema = useMemo(() => recoveryConfirmSchema(vault.recoveryKey), [vault.recoveryKey]);
+  const form = useForm<RecoveryConfirmValues>({
+    resolver: zodResolver(schema),
+    defaultValues: { typed: "" },
+    mode: "onChange",
+  });
+  const { isSubmitting, isValid, errors } = form.formState;
+
   async function copyKey() {
-    if (!vault) return;
     try {
       await navigator.clipboard.writeText(vault.recoveryKey);
       setCopied(true);
     } catch {
-      setError("Copy was blocked. Select the key and copy it by hand.");
+      form.setError("root.server", { message: "Copy was blocked. Select the key and copy it by hand." });
     }
   }
 
   function downloadKey() {
-    if (!vault) return;
     const text = `Apocrypha recovery key for ${email}\n\n${vault.recoveryKey}\n\nKeep this somewhere safe and offline. Anyone with it and your account can open your vault.\n`;
     const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
     const a = document.createElement("a");
@@ -94,10 +188,8 @@ export function CreateVaultForm({ email }: { email: string }) {
     URL.revokeObjectURL(url);
   }
 
-  async function save() {
-    if (!vault || !confirmed) return;
-    setError(null);
-    setStep("saving");
+  async function onSubmit() {
+    form.clearErrors("root.server");
     try {
       // The first environment's key is made here and only ever leaves this
       // browser wrapped to the user's own public key. The wrap binds the env id
@@ -124,24 +216,20 @@ export function CreateVaultForm({ email }: { email: string }) {
         }),
       });
       if (res.status === 409) {
-        setError("This account already has a vault. Your new keys were not saved.");
-        setStep("recovery");
+        form.setError("root.server", { message: "This account already has a vault. Your new keys were not saved." });
         return;
       }
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        setError(body?.error ?? "The server could not save your vault. Try again.");
-        setStep("recovery");
+        form.setError("root.server", { message: body?.error ?? "The server could not save your vault. Try again." });
         return;
       }
       const ids = (await res.json().catch(() => null)) as Partial<WorkspaceIds> | null;
       setUnlockedKeyPair(vault.keyPair);
       // Next keeps this page mounted but hidden after navigating away, so drop
-      // the recovery key and typed confirmation from state and the DOM now.
-      setVault(null);
-      setTyped("");
-      setCopied(false);
-      setStep("passphrase");
+      // the recovery key and the typed confirmation from state and the DOM now.
+      form.reset({ typed: "" });
+      onDiscard();
       // The vault is saved. Land in the new environment; /dashboard resolves
       // to the same place if the response was unreadable.
       router.replace(
@@ -150,153 +238,67 @@ export function CreateVaultForm({ email }: { email: string }) {
           : "/dashboard",
       );
     } catch {
-      setError("Could not reach the server. Check your connection and try again.");
-      setStep("recovery");
+      form.setError("root.server", { message: "Could not reach the server. Check your connection and try again." });
     }
   }
 
-  if (step === "recovery" || step === "saving") {
-    return (
-      <div className="mx-auto flex max-w-2xl flex-col gap-8 pt-6">
-        <Pane title="Your recovery key" tone="danger" meta="shown once">
-          <p className="text-bone-dim">
-            This key opens your vault if you forget the passphrase. We never
-            see it and can&apos;t show it again. Save it somewhere safe and
-            offline, such as a password manager or a printed page.
-          </p>
-          <p
-            data-testid="recovery-key"
-            className="mt-4 break-all border border-hairline bg-pane px-3 py-3 text-lg text-signal select-all"
-          >
-            {vault?.recoveryKey}
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={copyKey}>
-              {copied ? "Copied" : "Copy key"}
-            </Button>
-            <Button size="sm" variant="outline" onClick={downloadKey}>
-              Download as .txt
-            </Button>
-          </div>
-
-          <div className="mt-6">
-            <label htmlFor="rk-confirm" className="text-bone">
-              Type the last 4 characters of the key to confirm you saved it
-            </label>
-            <input
-              id="rk-confirm"
-              value={typed}
-              onChange={(e) => setTyped(e.target.value)}
-              autoComplete="off"
-              spellCheck={false}
-              maxLength={12}
-              className={`${field} mt-2 max-w-48`}
-            />
-          </div>
-
-          {error && (
-            <p role="alert" className="mt-4 text-blood-bright">
-              {error}
-            </p>
-          )}
-
-          <div className="mt-6 flex items-center gap-3">
-            <Button disabled={!confirmed || step === "saving"} onClick={save}>
-              {step === "saving" ? "Saving vault" : "Create vault"}
-            </Button>
-            <span className="text-xs text-bone-faint">
-              Nothing is saved to the server until you confirm.
-            </span>
-          </div>
-        </Pane>
-      </div>
-    );
-  }
-
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-8 pt-6">
-      <form onSubmit={seal} noValidate>
-        <Pane title="Create your vault" meta={email}>
-          <p className="max-w-[60ch] text-bone-dim">
-            Your passphrase locks a key that only this browser holds. We store
-            the locked key and never the passphrase, so we can&apos;t reset it.
-            You&apos;ll enter it on every new device.
-          </p>
+    <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
+      <Pane title="Your recovery key" tone="danger" meta="shown once">
+        <p className="text-bone-dim">
+          This key opens your vault if you forget the passphrase. We never see it and can&apos;t show it again. Save it
+          somewhere safe and offline, such as a password manager or a printed page.
+        </p>
+        <p
+          data-testid="recovery-key"
+          className="mt-4 break-all border border-hairline bg-pane px-3 py-3 text-lg text-signal select-all"
+        >
+          {vault.recoveryKey}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button type="button" size="sm" variant="outline" onClick={copyKey}>
+            {copied ? "Copied" : "Copy key"}
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={downloadKey}>
+            Download as .txt
+          </Button>
+        </div>
 
-          <div className="mt-6">
-            <label htmlFor="passphrase" className="text-bone">
-              Vault passphrase
-            </label>
-            <div className="mt-2 flex gap-2">
-              <input
-                id="passphrase"
-                type={show ? "text" : "password"}
-                value={passphrase}
-                onChange={(e) => setPassphrase(e.target.value)}
-                autoComplete="new-password"
-                spellCheck={false}
-                className={field}
-                aria-describedby="strength-hint"
-              />
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => setShow((s) => !s)}
-                aria-pressed={show}
-              >
-                {show ? "Hide" : "Show"}
-              </Button>
-            </div>
-
-            <div className="mt-3 flex gap-1" aria-hidden>
-              {[0, 1, 2, 3].map((i) => (
-                <span
-                  key={i}
-                  className={`h-1 flex-1 ${
-                    passphrase && i < levelFill[strength.level]
-                      ? levelColor[strength.level]
-                      : "bg-hairline-faint"
-                  }`}
+        <FieldGroup className="mt-6">
+          <Controller
+            name="typed"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor="rk-confirm">Type the last 4 characters of the key to confirm you saved it</FieldLabel>
+                <Input
+                  {...field}
+                  id="rk-confirm"
+                  autoComplete="off"
+                  spellCheck={false}
+                  maxLength={12}
+                  className="max-w-48"
+                  aria-invalid={fieldState.invalid}
                 />
-              ))}
-            </div>
-            <p id="strength-hint" className="mt-2 text-xs text-bone-faint">
-              {passphrase ? strength.hint : "At least 12 characters. Four random words works well."}
-            </p>
-          </div>
-
-          <div className="mt-5">
-            <label htmlFor="confirm" className="text-bone">
-              Confirm passphrase
-            </label>
-            <input
-              id="confirm"
-              type={show ? "text" : "password"}
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              autoComplete="new-password"
-              spellCheck={false}
-              className={`${field} mt-2`}
-            />
-            {confirm && !matches && (
-              <p className="mt-2 text-xs text-blood-bright">The passphrases don&apos;t match.</p>
+                {fieldState.invalid && field.value !== "" && <FieldError errors={[fieldState.error]} />}
+              </Field>
             )}
-          </div>
+          />
+        </FieldGroup>
 
-          {error && (
-            <p role="alert" className="mt-4 text-blood-bright">
-              {error}
-            </p>
-          )}
+        {errors.root?.server && (
+          <Alert variant="destructive" className="mt-4">
+            <AlertDescription>{errors.root.server.message}</AlertDescription>
+          </Alert>
+        )}
 
-          <div className="mt-6 flex items-center gap-3">
-            <Button type="submit" disabled={!canSeal && step !== "sealing"}>
-              {step === "sealing" ? "Sealing, this takes a moment" : "Seal vault"}
-            </Button>
-          </div>
-        </Pane>
-      </form>
-    </div>
+        <div className="mt-6 flex items-center gap-3">
+          <Button type="submit" disabled={!isValid || isSubmitting}>
+            {isSubmitting ? "Saving vault" : "Create vault"}
+          </Button>
+          <span className="text-xs text-bone-faint">Nothing is saved to the server until you confirm.</span>
+        </div>
+      </Pane>
+    </form>
   );
 }
