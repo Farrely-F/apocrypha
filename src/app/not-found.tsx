@@ -7,16 +7,16 @@ export const metadata = { title: "Not found", robots: { index: false, follow: fa
 
 export default function NotFound() {
   return (
-    <AuthStage>
+    <AuthStage ground={false} flush>
       <StatusPane
         code="404"
-        title="Not found"
+        title="Lost in the stacks"
         actions={
           <>
             <Link href="/" className={buttonVariants({ size: "sm" })}>
               Back to the start
             </Link>
-            <Link href="/dashboard" className={buttonVariants({ size: "sm", variant: "outline" })}>
+            <Link href="/dashboard" className={buttonVariants({ size: "sm", variant: "secondary", className: "border-hairline" })}>
               Your workspace
             </Link>
           </>

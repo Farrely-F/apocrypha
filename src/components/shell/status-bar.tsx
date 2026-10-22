@@ -31,7 +31,7 @@ function Segment({
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center gap-2 border-r border-hairline-faint px-3",
+        "flex shrink-0 items-center gap-2 px-3",
         className,
       )}
     >
@@ -70,20 +70,20 @@ export function StatusBar({
     <footer
       aria-label="Vault status"
       className={cn(
-        "relative isolate flex h-8 items-stretch overflow-x-auto border-t border-hairline bg-background text-xs whitespace-nowrap",
+        "relative isolate flex h-8 items-stretch overflow-x-auto text-xs whitespace-nowrap",
         className,
       )}
     >
-      <div
-        aria-hidden
-        className="mora-tex-stacks-painted pointer-events-none absolute inset-0 -z-10 opacity-[0.18] [mask-image:linear-gradient(to_right,#000,transparent_70%)]"
-      />
-      <Segment label="org">
-        <Value value={org} />
-      </Segment>
-      <Segment label="env">
-        <Value value={env} />
-      </Segment>
+      {org ? (
+        <Segment label="org" className="hidden sm:flex">
+          <Value value={org} />
+        </Segment>
+      ) : null}
+      {env ? (
+        <Segment label="env">
+          <Value value={env} />
+        </Segment>
+      ) : null}
       <Segment label="vault">
         <span
           key={lock}
@@ -97,11 +97,11 @@ export function StatusBar({
           {lock}
         </span>
       </Segment>
-      <Segment label="key">
-        <Value
-          value={keyVersion == null ? null : `v${String(keyVersion)}`}
-        />
-      </Segment>
+      {keyVersion != null ? (
+        <Segment label="key" className="hidden sm:flex">
+          <Value value={`v${String(keyVersion)}`} />
+        </Segment>
+      ) : null}
       <div className="ml-auto flex shrink-0 items-center px-3 text-bone-faint">
         {trailing}
       </div>

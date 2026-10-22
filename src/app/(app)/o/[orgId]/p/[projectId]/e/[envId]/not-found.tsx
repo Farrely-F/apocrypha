@@ -6,18 +6,18 @@ import { buttonVariants } from "@/components/ui/button";
 // grant for. The two are deliberately indistinguishable.
 export default function EnvironmentNotFound() {
   return (
-    <div className="mx-auto flex max-w-2xl pt-6">
+    <div className="-m-4 flex w-[calc(100%+2rem)] sm:-m-6 sm:w-[calc(100%+3rem)]">
       <StatusPane
         code="404"
-        title="Not found"
+        title="No such folio"
         actions={
           <Link href="/dashboard" className={buttonVariants({ size: "sm" })}>
             Back to your workspace
           </Link>
         }
       >
-        <p className="text-bone">No such environment, or you don&apos;t have access to it.</p>
-        <p>If someone shared it with you, ask them to check your access.</p>
+        <p className="text-bone">No such environment, or you don&apos;t have access.</p>
+        <p>Ask the person who shared it to check your access.</p>
       </StatusPane>
     </div>
   );

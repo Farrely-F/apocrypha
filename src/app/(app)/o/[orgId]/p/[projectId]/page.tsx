@@ -4,12 +4,14 @@ import { notFound } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { EmptyState } from "@/components/brand/empty-state";
 import { Pane, PageSkeleton } from "@/components/shell";
-import { ListView, RailNote } from "@/components/workspace/list-view";
+import { ListView, catalogue } from "@/components/workspace/list-view";
+import { EnvironmentRowActions, NewEnvironmentButton } from "@/components/workspace/workspace-dialogs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
 import { listWorkspaceTree } from "@/lib/workspace/manage";
-import { environmentPath, isUuid, orgPath } from "@/lib/workspace/shared";
+import { environmentPath, isUuid, projectPath } from "@/lib/workspace/shared";
+import { cn } from "@/lib/utils";
 
 type Params = Promise<{ orgId: string; projectId: string }>;
 export const instant = false;
@@ -22,54 +24,77 @@ async function Environments({ params }: { params: Params }) {
   const project = org?.projects.find((p) => p.id === projectId);
   if (!org || !project) notFound();
 
+  const canBuild = org.role === "owner" || org.role === "admin";
+
   return (
     <ListView
-      crumbs={[
-        { label: "Organisations", href: "/dashboard" },
-        { label: org.name, href: orgPath(org.id) },
-        { label: project.name },
-      ]}
       title={project.name}
-      summary={`${project.environments.length} ${project.environments.length === 1 ? "environment" : "environments"} you can open`}
-      rail={
-        <>
-          <RailNote title="Environments">
-            <p>One key per environment, wrapped to each person allowed in. Open one to read and write its secrets.</p>
-          </RailNote>
-          <RailNote title="Missing one?">
-            <p>You only see environments you hold a key for. Access is set per member by an admin.</p>
-          </RailNote>
-        </>
+      actions={
+        canBuild && project.environments.length > 0 ? (
+          <NewEnvironmentButton
+            projectId={project.id}
+            projectName={project.name}
+            taken={project.environments.map((e) => e.name)}
+          />
+        ) : undefined
       }
     >
-      <Pane title="Environments" meta={project.name} flush>
+      <Pane flush className="border-0 bg-abyss/65 backdrop-blur-md">
         {project.environments.length === 0 ? (
-          <div className="px-5 pb-5">
-            <EmptyState title="Nothing open here">You hold no key for any environment in this project. Ask an admin to give you access.</EmptyState>
-          </div>
+          <EmptyState
+            title="No environment yet"
+            actions={
+              canBuild ? (
+                <NewEnvironmentButton
+                  projectId={project.id}
+                  projectName={project.name}
+                  taken={[]}
+                  size="sm"
+                />
+              ) : undefined
+            }
+          >
+            {canBuild
+              ? "Each environment gets its own key. Create dev, staging, or production."
+              : "You hold no key for any environment in this project. Ask an admin for access."}
+          </EmptyState>
         ) : (
-          <Table className="mt-3">
+          <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead className="pl-5">Name</TableHead>
-                <TableHead className="w-12">
-                  <span className="sr-only">Open</span>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className={cn(catalogue.head, "pl-5")}>Environment</TableHead>
+                <TableHead className={cn(catalogue.head, "w-24 pr-3 text-right")}>
+                  <span className="sr-only">Actions</span>
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {project.environments.map((e) => (
-                <TableRow key={e.id} className="group/row">
+                <TableRow key={e.id} className={catalogue.row}>
                   <TableCell className="pl-5">
                     <Link
                       href={environmentPath({ orgId: org.id, projectId: project.id, envId: e.id })}
-                      className="text-bone transition-colors group-hover/row:text-signal"
+                      className={catalogue.name}
                     >
                       {e.name}
                     </Link>
                   </TableCell>
-                  <TableCell>
-                    <ChevronRight aria-hidden className="size-4 text-bone-faint transition-colors group-hover/row:text-signal" />
+                  <TableCell className="pr-3">
+                    <div className="flex items-center justify-end gap-1">
+                      <EnvironmentRowActions
+                        environment={{ id: e.id, name: e.name }}
+                        siblings={project.environments.map((s) => s.name)}
+                        canBuild={canBuild}
+                        redirect={projectPath(org.id, project.id)}
+                      />
+                      <Link
+                        href={environmentPath({ orgId: org.id, projectId: project.id, envId: e.id })}
+                        aria-label={`Open ${e.name}`}
+                        className={catalogue.chevron}
+                      >
+                        <ChevronRight aria-hidden className="size-4" />
+                      </Link>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

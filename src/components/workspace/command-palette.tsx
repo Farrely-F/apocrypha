@@ -40,9 +40,9 @@ export function CommandPalette({ tree }: { tree: TreeOrg[] }) {
   return (
     <>
       <Button
-        variant="outline"
+        variant="ghost"
         size="sm"
-        className="absolute top-1/2 left-1/2 z-10 hidden h-8 w-64 -translate-x-1/2 -translate-y-1/2 justify-start gap-2 border-hairline-faint bg-pane px-2.5 font-normal text-bone-faint hover:border-signal-dim hover:text-bone md:inline-flex"
+        className="absolute top-1/2 left-1/2 z-10 hidden h-8 w-64 -translate-x-1/2 -translate-y-1/2 justify-start gap-2 border-0 bg-transparent px-2.5 font-normal text-bone-faint hover:bg-pane/40 hover:text-bone xl:inline-flex"
         onClick={() => setOpen(true)}
         aria-label="Open command palette"
       >
@@ -53,7 +53,7 @@ export function CommandPalette({ tree }: { tree: TreeOrg[] }) {
       <Button
         variant="ghost"
         size="icon-sm"
-        className="shrink-0 text-bone-faint md:hidden"
+        className="shrink-0 text-bone-faint xl:hidden"
         onClick={() => setOpen(true)}
         aria-label="Open command palette"
       >

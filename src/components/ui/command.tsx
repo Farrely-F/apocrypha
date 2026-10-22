@@ -50,7 +50,7 @@ function CommandDialog({
       </DialogHeader>
       <DialogContent
         className={cn(
-          "top-[16%] translate-y-0 sm:max-w-xl",
+          "top-16 translate-y-0 sm:max-w-xl",
           className
         )}
         showCloseButton={showCloseButton}

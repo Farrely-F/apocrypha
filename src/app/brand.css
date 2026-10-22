@@ -152,11 +152,12 @@
     content: "";
     position: absolute;
     z-index: 1;
-    width: 44px;
+    width: 92px;
     aspect-ratio: 683 / 1033;
+    filter: brightness(1.1);
     background: url("/brand/frame-corner.webp") center / contain no-repeat;
     pointer-events: none;
   }
-  &::before { top: -4px; left: -4px; }
-  &::after { right: -4px; bottom: -4px; rotate: 180deg; }
+  &::before { top: -9px; left: -9px; }
+  &::after { right: -9px; bottom: -9px; rotate: 180deg; }
 }

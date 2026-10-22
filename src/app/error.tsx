@@ -7,24 +7,24 @@ import { Button, buttonVariants } from "@/components/ui/button";
 
 export default function ErrorPage({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
-    <AuthStage>
+    <AuthStage ground={false} flush>
       <StatusPane
         code={error.digest ? `ref ${error.digest}` : "error"}
-        title="Something went wrong"
+        title="A page tore"
         art="book"
         actions={
           <>
             <Button size="sm" onClick={reset}>
               Try again
             </Button>
-            <Link href="/" className={buttonVariants({ size: "sm", variant: "outline" })}>
+            <Link href="/" className={buttonVariants({ size: "sm", variant: "secondary", className: "border-hairline" })}>
               Back to the start
             </Link>
           </>
         }
       >
-        <p className="text-bone">That did not work, and nothing you stored was changed.</p>
-        <p>Try again. If it keeps happening, check your connection and reload.</p>
+        <p className="text-bone">That did not work. Nothing you stored was changed.</p>
+        <p>Try again. If it keeps happening, reload the page.</p>
       </StatusPane>
     </AuthStage>
   );

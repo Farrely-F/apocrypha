@@ -43,19 +43,20 @@ function Frame({ email, tree, children }: { email: string; tree: TreeOrg[]; chil
   if (!unlocked) return <div className="h-dvh bg-background" />;
 
   return (
-    <div className="flex h-dvh flex-col bg-background">
+    <div className="relative flex h-dvh flex-col overflow-hidden bg-background">
+      <AppGround />
       <ShellHeader
+        className="relative z-10"
         nav={unlocked ? <WorkspaceNav tree={tree} /> : undefined}
         actions={
           <>
             <CommandPalette tree={tree} />
-            <span className="hidden text-xs text-bone-faint sm:inline">{email}</span>
+            <span className="hidden text-xs text-bone-faint xl:inline">{email}</span>
             <SignOutButton />
           </>
         }
       />
-      <div className="relative min-h-0 flex-1">
-        <AppGround />
+      <div className="relative z-10 min-h-0 flex-1">
         <div id="main" className="absolute inset-0 overflow-y-auto">
           <InfoContext.Provider value={setInfo}>
             <div className="p-4 sm:p-6">{children}</div>
@@ -63,6 +64,7 @@ function Frame({ email, tree, children }: { email: string; tree: TreeOrg[]; chil
         </div>
       </div>
       <StatusBar
+        className="relative z-10"
         org={unlocked ? info.org : null}
         env={unlocked ? info.env : null}
         keyVersion={unlocked ? info.keyVersion : null}

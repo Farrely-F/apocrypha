@@ -2,12 +2,15 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { Pane, PageSkeleton } from "@/components/shell";
-import { ListView, RailNote } from "@/components/workspace/list-view";
+import { EmptyState } from "@/components/brand/empty-state";
+import { ListView, catalogue } from "@/components/workspace/list-view";
+import { NewOrganizationButton } from "@/components/workspace/workspace-dialogs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
 import { listWorkspaceTree } from "@/lib/workspace/manage";
 import { orgPath } from "@/lib/workspace/shared";
+import { cn } from "@/lib/utils";
 
 // All content lives behind the session check: anything rendered outside the
 // Suspense boundary is prerendered into the static shell and would be sent to
@@ -20,13 +23,15 @@ async function Dashboard() {
   // server cannot make one: it has to be wrapped in the user's browser.
   if (orgs.length === 0) {
     return (
-      <div className="mx-auto max-w-2xl pt-6">
-        <Pane title="No workspace" meta={user.email}>
-          <p className="text-bone">This account has a vault but no environment.</p>
-          <p className="mt-2 max-w-[60ch] text-bone-dim">
-            The vault was made before workspaces existed. An environment&apos;s key is created in
-            your browser, so the server cannot add one for you.
-          </p>
+      <div className="mx-auto w-full max-w-3xl pt-1">
+        <Pane flush className="border-0 bg-abyss/65 backdrop-blur-md">
+          <EmptyState
+            title="A vault without a shelf"
+            actions={<NewOrganizationButton size="sm" />}
+          >
+            This account has a vault but no environment. Creating an organisation makes the first
+            project and environment in this browser.
+          </EmptyState>
         </Pane>
       </div>
     );
@@ -34,55 +39,46 @@ async function Dashboard() {
 
   return (
     <ListView
-      crumbs={[{ label: "Apocrypha" }]}
       title="Organisations"
-      summary={`${orgs.length} ${orgs.length === 1 ? "organisation" : "organisations"}, signed in as ${user.email}`}
-      rail={
-        <>
-          <RailNote title="How it nests">
-            <p className="text-bone">Organisation, project, environment.</p>
-            <p>An organisation holds projects. A project holds environments such as dev, staging and prod.</p>
-            <p>Each environment has its own key, and its secrets live inside it.</p>
-          </RailNote>
-          <RailNote title="Roles">
-            <p>
-              <span className="text-bone">owner</span> and <span className="text-bone">admin</span> manage members and access.
-            </p>
-            <p>
-              <span className="text-bone">member</span> works in the environments they are given.
-            </p>
-          </RailNote>
-        </>
-      }
+      actions={<NewOrganizationButton />}
     >
-      <Pane title="Your organisations" meta="open one" flush>
-        <Table className="mt-3">
+      <Pane flush className="border-0 bg-abyss/65 backdrop-blur-md">
+        <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead className="pl-5">Name</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead className="text-right">Projects</TableHead>
-              <TableHead className="text-right">Environments</TableHead>
-              <TableHead className="w-12">
+            <TableRow className="hover:bg-transparent">
+              <TableHead className={cn(catalogue.head, "pl-5")}>Organisation</TableHead>
+              <TableHead className={cn(catalogue.head, "hidden sm:table-cell")}>Role</TableHead>
+              <TableHead className={cn(catalogue.head, "text-right")}>Projects</TableHead>
+              <TableHead className={cn(catalogue.head, "hidden text-right sm:table-cell")}>Environments</TableHead>
+              <TableHead className={cn(catalogue.head, "w-14 pr-5")}>
                 <span className="sr-only">Open</span>
               </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {orgs.map((o) => (
-              <TableRow key={o.id} className="group/row">
+              <TableRow key={o.id} className={catalogue.row}>
                 <TableCell className="pl-5">
-                  <Link href={orgPath(o.id)} className="text-bone transition-colors group-hover/row:text-signal">
+                  <Link href={orgPath(o.id)} className={catalogue.name}>
                     {o.name}
                   </Link>
                 </TableCell>
-                <TableCell className="text-bone-dim">{o.role}</TableCell>
-                <TableCell className="text-right text-bone-dim">{o.projects.length}</TableCell>
-                <TableCell className="text-right text-bone-dim">
-                  {o.projects.reduce((n, p) => n + p.environments.length, 0)}
+                <TableCell className={cn(catalogue.quiet, "hidden sm:table-cell")}>
+                  <span className="inline-flex items-center gap-2 text-[0.66rem] uppercase tracking-[0.16em]">
+                    <span aria-hidden className={cn("size-1.5", o.role === "owner" ? "bg-signal" : "bg-bone-faint/60")} />
+                    {o.role}
+                  </span>
                 </TableCell>
-                <TableCell>
-                  <ChevronRight aria-hidden className="size-4 text-bone-faint transition-colors group-hover/row:text-signal" />
+                <TableCell className="text-right font-display text-lg leading-none text-bone-dim">
+                  {String(o.projects.length).padStart(2, "0")}
+                </TableCell>
+                <TableCell className={cn(catalogue.quiet, "hidden text-right font-display text-lg leading-none sm:table-cell")}>
+                  {String(o.projects.reduce((n, p) => n + p.environments.length, 0)).padStart(2, "0")}
+                </TableCell>
+                <TableCell className="pr-5">
+                  <Link href={orgPath(o.id)} aria-label={`Open ${o.name}`} className={cn(catalogue.chevron, "ml-auto")}>
+                    <ChevronRight aria-hidden className="size-4" />
+                  </Link>
                 </TableCell>
               </TableRow>
             ))}

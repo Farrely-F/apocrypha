@@ -19,10 +19,22 @@ export function AuthGround() {
 }
 
 /** A full page gate: the painted ground, a wordmark back to the landing page, and the content. */
-export function AuthStage({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
+export function AuthStage({
+  children,
+  wide = false,
+  ground = true,
+  flush = false,
+}: {
+  children: ReactNode;
+  wide?: boolean;
+  /** Painted library behind the form. Off for full-bleed status scenes. */
+  ground?: boolean;
+  /** Let the content cover the viewport instead of sitting in the form column. */
+  flush?: boolean;
+}) {
   return (
     <div className="relative isolate flex min-h-dvh flex-col overflow-x-clip bg-background">
-      <AuthGround />
+      {ground && <AuthGround />}
       <header className="relative z-10 mx-auto flex w-full max-w-[96rem] items-center px-6 py-5 sm:px-10">
         <Link href="/" className="group flex items-center gap-2.5 text-bone">
           <Seal title="" aria-hidden className="size-6 text-signal-dim transition-colors group-hover:text-signal" />
@@ -34,8 +46,11 @@ export function AuthStage({ children, wide = false }: { children: ReactNode; wid
       <main
         id="main"
         className={cn(
-          "relative z-10 mx-auto flex w-full max-w-[96rem] flex-1 justify-center px-6 pb-16 sm:px-10",
-          wide ? "items-start pt-4" : "items-center lg:justify-start",
+          "relative z-10 flex w-full flex-1",
+          flush
+            ? "items-stretch justify-center px-0 pb-0"
+            : "mx-auto max-w-[96rem] justify-center px-6 pb-16 sm:px-10",
+          !flush && (wide ? "items-start pt-4" : "items-center lg:justify-start"),
         )}
       >
         {children}

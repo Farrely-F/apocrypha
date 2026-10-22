@@ -1,10 +1,12 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Copy, Download, Ellipsis, Eye, EyeOff, History, Link2, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import { Check, Copy, Download, Ellipsis, Eye, EyeOff, History, Link2, Pencil, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { Pane } from "@/components/shell";
 import { useVault } from "@/components/vault";
 import { EmptyState } from "@/components/brand/empty-state";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -28,7 +30,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -261,19 +262,30 @@ export function SecretsPane({
 
   return (
     <TooltipProvider delay={300}>
-      <Pane title="Secrets" meta={ready ? String(items.length) : "..."}>
-        {loaded.state === "loading" && <p className="text-bone-faint">Opening this environment&apos;s key...</p>}
+      <Pane flush className="border-0 bg-abyss/65 backdrop-blur-md">
+        {loaded.state === "loading" && (
+          <div className="flex items-center gap-3 border-b border-hairline-faint px-5 py-4 text-sm text-bone-faint">
+            <span aria-hidden className="mora-caret" />
+            Opening this environment&apos;s key...
+          </div>
+        )}
         {loaded.state === "error" && (
-          <Alert variant="destructive">
-            <AlertDescription>{loaded.message}</AlertDescription>
-          </Alert>
+          <div className="px-5 py-4">
+            <Alert variant="destructive">
+              <AlertDescription>{loaded.message}</AlertDescription>
+            </Alert>
+          </div>
         )}
 
         {ready && (
-          <div className="flex min-h-8 flex-wrap items-center gap-2">
+          <div className="border-b border-hairline-faint">
             {selecting ? (
-              <>
-                <span className="text-bone" data-testid="selection-count">
+              <div className="flex flex-wrap items-center gap-2 bg-signal/[0.045] px-5 py-3">
+                <span
+                  className="flex items-center gap-2 pr-2 text-[0.65rem] uppercase tracking-[0.2em] text-signal"
+                  data-testid="selection-count"
+                >
+                  <span aria-hidden className="size-1.5 bg-signal" />
                   {pickedItems.length} selected
                 </span>
                 <Button size="sm" variant="outline" onClick={() => void copyText("sel", dotenv(pickedItems))}>
@@ -292,24 +304,44 @@ export function SecretsPane({
                     Delete
                   </Button>
                 )}
-                <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+                <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setSelected(new Set())}>
                   <X data-icon="inline-start" />
                   Clear
                 </Button>
-              </>
+              </div>
             ) : (
-              <>
-                <Input
-                  aria-label="Filter secrets by name"
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                  placeholder="Filter by name"
-                  autoComplete="off"
-                  spellCheck={false}
-                  className="min-w-0 flex-1 sm:max-w-56 sm:flex-none"
-                />
+              <div className="flex flex-wrap items-center gap-2 px-5 py-3">
+                <InputGroup className="h-8 w-full min-w-0 bg-abyss/50 sm:w-60">
+                  <InputGroupAddon aria-hidden>
+                    <Search className="text-bone-faint" />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    aria-label="Filter secrets by name"
+                    className="h-full"
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value)}
+                    placeholder="Find a name"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  {filter && (
+                    <InputGroupAddon align="inline-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label="Clear filter"
+                        className="text-bone-faint hover:text-signal"
+                        onClick={() => setFilter("")}
+                      >
+                        <X />
+                      </Button>
+                    </InputGroupAddon>
+                  )}
+                </InputGroup>
+
                 <Select value={sort} onValueChange={(v) => v && setSort(v as Sort)} items={SORTS}>
-                  <SelectTrigger aria-label="Sort secrets" className="w-32">
+                  <SelectTrigger aria-label="Sort secrets" className="w-28">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -320,13 +352,31 @@ export function SecretsPane({
                     ))}
                   </SelectContent>
                 </Select>
-                <span className="ml-auto flex gap-2">
+
+                <span className="ml-auto flex items-center gap-1">
                   <DropdownMenu>
-                    <DropdownMenuTrigger render={<Button size="sm" variant="outline" disabled={items.length === 0} />}>
-                      <Download data-icon="inline-start" />
-                      <span className="hidden sm:inline">Export</span>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <DropdownMenuTrigger
+                            render={
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                className="[&_svg]:size-4"
+                                aria-label="Export secrets"
+                                disabled={items.length === 0}
+                              />
+                            }
+                          />
+                        }
+                      >
+                        <Download />
+                      </TooltipTrigger>
+                      <TooltipContent>Export</TooltipContent>
+                    </Tooltip>
+                    <DropdownMenuContent align="end" className="w-56">
                       <DropdownMenuGroup>
                         <DropdownMenuLabel>Writes every value in plain text</DropdownMenuLabel>
                         <DropdownMenuItem onClick={() => download(`${envName}.env`, dotenv(items))}>Download .env</DropdownMenuItem>
@@ -337,179 +387,246 @@ export function SecretsPane({
                       </DropdownMenuGroup>
                     </DropdownMenuContent>
                   </DropdownMenu>
+
                   {canWrite && (
                     <>
-                      <Button size="sm" variant="outline" disabled={items.length === 0} onClick={() => setSharing(items)}>
-                        <Link2 data-icon="inline-start" />
-                        <span className="hidden sm:inline">Share</span>
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setImporting(true)}>
-                        <Upload data-icon="inline-start" />
-                        <span className="hidden sm:inline">Import</span>
-                      </Button>
-                      <Button size="sm" onClick={() => setAdding(true)}>
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              className="[&_svg]:size-4"
+                              aria-label="Share secrets"
+                              disabled={items.length === 0}
+                              onClick={() => setSharing(items)}
+                            />
+                          }
+                        >
+                          <Link2 />
+                        </TooltipTrigger>
+                        <TooltipContent>Share</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              className="[&_svg]:size-4"
+                              aria-label="Import a .env"
+                              onClick={() => setImporting(true)}
+                            />
+                          }
+                        >
+                          <Upload />
+                        </TooltipTrigger>
+                        <TooltipContent>Import a .env</TooltipContent>
+                      </Tooltip>
+                      <span aria-hidden className="mx-1 h-5 w-px bg-hairline-faint" />
+                      <Button size="sm" aria-label="Add secret" onClick={() => setAdding(true)}>
                         <Plus data-icon="inline-start" />
                         <span className="hidden sm:inline">Add secret</span>
                       </Button>
                     </>
                   )}
                 </span>
-              </>
+              </div>
             )}
           </div>
         )}
 
         {notice && (
-          <Alert className="mt-3" data-testid="notice">
-            <AlertDescription>{notice}</AlertDescription>
-          </Alert>
+          <div className="px-5 pt-4">
+            <Alert data-testid="notice">
+              <AlertDescription>{notice}</AlertDescription>
+            </Alert>
+          </div>
         )}
 
         {ready && items.length === 0 && (
-          <EmptyState
-            title="No secrets yet"
-            actions={
-              canWrite ? (
-                <>
-                  <Button size="sm" onClick={() => setAdding(true)}>
-                    <Plus data-icon="inline-start" />
-                    Add secret
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setImporting(true)}>
-                    <Upload data-icon="inline-start" />
-                    Import a .env
-                  </Button>
-                </>
-              ) : undefined
-            }
-          >
+          <EmptyState title="The registry is empty">
             {canWrite
               ? "Anything you add is encrypted in this browser with this environment's key before it leaves it."
               : "Nothing has been added here. You can read this environment, but only people with write access can add secrets."}
           </EmptyState>
         )}
-        {ready && items.length > 0 && visible.length === 0 && <p className="mt-4 text-bone-dim">No secret matches &ldquo;{filter}&rdquo;.</p>}
+        {ready && items.length > 0 && visible.length === 0 && (
+          <div className="border-t border-hairline-faint px-5 py-10 text-center">
+            <p className="font-display text-xl text-bone">Nothing under &ldquo;{filter}&rdquo;</p>
+            <p className="mt-1 text-sm text-bone-faint">The registry is still there; clear the filter to see it.</p>
+          </div>
+        )}
 
         {visible.length > 0 && (
-          <Table className="mt-4">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10">
-                  <Checkbox
-                    aria-label="Select all"
-                    checked={allVisibleSelected}
-                    indeterminate={!allVisibleSelected && someVisibleSelected}
-                    onCheckedChange={(c) =>
-                      setSelected(c ? new Set([...selected, ...visible.map((i) => i.id)]) : new Set([...selected].filter((id) => !visible.some((v) => v.id === id))))
-                    }
-                  />
-                </TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead className="hidden w-[40%] sm:table-cell">Value</TableHead>
-                <TableHead className="w-24 text-right sm:w-28">
-                  <span className="sr-only">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {visible.map((item) => {
-                const shown = revealed.has(item.id);
-                const lines = item.value.split("\n").length;
-                return (
-                  <Fragment key={item.id}>
-                    <TableRow data-secret={item.name} data-state={selected.has(item.id) ? "selected" : undefined}>
-                      <TableCell>
-                        <Checkbox
-                          aria-label={`Select ${item.name}`}
-                          checked={selected.has(item.id)}
-                          onCheckedChange={() => setSelected(flip(selected, item.id))}
-                        />
-                      </TableCell>
-                      <TableCell className="max-w-0 font-medium break-words whitespace-normal text-bone sm:max-w-none">{item.name}</TableCell>
-                      <TableCell className="hidden sm:table-cell">
-                        <span data-testid={`value-${item.name}`} className={shown ? "text-signal" : "text-bone-faint"}>
-                          {shown ? (
-                            <span className="line-clamp-2 break-all whitespace-pre-wrap">{item.value}</span>
-                          ) : (
-                            MASK
-                          )}
-                        </span>
-                        {shown && lines > 2 && <span className="text-xs text-bone-faint"> +{lines - 2} more lines</span>}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-0.5">
-                          <IconAction label={shown ? "Hide value" : "Reveal value"} pressed={shown} onClick={() => setRevealed(flip(revealed, item.id))}>
-                            {shown ? <EyeOff /> : <Eye />}
-                          </IconAction>
-                          <IconAction label="Copy value" onClick={() => void copyText(item.id, item.value)}>
-                            {copied === item.id ? <Check className="text-signal" /> : <Copy />}
-                          </IconAction>
-                          <DropdownMenu>
-                            <Tooltip>
-                              <TooltipTrigger
-                                render={
-                                  <DropdownMenuTrigger
-                                    render={<Button type="button" variant="ghost" size="icon-sm" className="[&_svg]:size-4" aria-label={`More actions for ${item.name}`} />}
-                                  />
-                                }
-                              >
-                                <Ellipsis />
-                              </TooltipTrigger>
-                              <TooltipContent>More</TooltipContent>
-                            </Tooltip>
-                            <DropdownMenuContent align="end">
-                              {canWrite && (
-                                <DropdownMenuItem onClick={() => setEditing(editing === item.id ? null : item.id)}>
-                                  <Pencil /> Edit
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem onClick={() => setHistoryOf(item)}>
-                                <History /> History
-                              </DropdownMenuItem>
-                              {canWrite && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem variant="destructive" onClick={() => setDeleting([item])}>
-                                    <Trash2 /> Delete
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    {editing === item.id && (
-                      <TableRow>
-                        <TableCell colSpan={4} className="whitespace-normal">
-                          <SecretEditor
-                            item={item}
-                            envId={envId}
-                            keyVersion={keyVersion}
-                            keys={keys}
-                            others={new Set([...names].filter((n) => n !== item.name))}
-                            onSaved={(next) => {
-                              upsert(next);
-                              setEditing(null);
-                            }}
-                            onGone={() => {
-                              removeMany(new Set([item.id]));
-                              setEditing(null);
-                            }}
-                            onCancel={() => setEditing(null)}
+          <>
+            <Table className="min-w-[44rem]">
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="h-9 w-12 pl-5">
+                    <Checkbox
+                      aria-label="Select all"
+                      checked={allVisibleSelected}
+                      indeterminate={!allVisibleSelected && someVisibleSelected}
+                      onCheckedChange={(c) =>
+                        setSelected(c ? new Set([...selected, ...visible.map((i) => i.id)]) : new Set([...selected].filter((id) => !visible.some((v) => v.id === id))))
+                      }
+                    />
+                  </TableHead>
+                  <TableHead className="h-9 w-10 pr-0 text-[0.65rem] font-normal uppercase tracking-[0.2em] text-bone-faint">
+                    No.
+                  </TableHead>
+                  <TableHead className="h-9 text-[0.65rem] font-normal uppercase tracking-[0.2em] text-bone-faint">
+                    Name
+                  </TableHead>
+                  <TableHead className="h-9 w-[38%] text-[0.65rem] font-normal uppercase tracking-[0.2em] text-bone-faint">
+                    Sealed value
+                  </TableHead>
+                  <TableHead className="h-9 w-24 pr-3 text-right sm:w-28">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {visible.map((item, index) => {
+                  const shown = revealed.has(item.id);
+                  const lines = item.value.split("\n").length;
+                  return (
+                    <Fragment key={item.id}>
+                      <TableRow
+                        data-secret={item.name}
+                        data-state={selected.has(item.id) ? "selected" : undefined}
+                        className="group/row h-14 border-hairline-faint transition-colors hover:bg-pane/50 data-[state=selected]:bg-signal/[0.06]"
+                      >
+                        <TableCell className="pl-5">
+                          <Checkbox
+                            aria-label={`Select ${item.name}`}
+                            checked={selected.has(item.id)}
+                            onCheckedChange={() => setSelected(flip(selected, item.id))}
                           />
                         </TableCell>
+                        <TableCell className="w-10 pr-0 font-display text-sm text-bone-faint/70 transition-colors group-hover/row:text-signal-dim">
+                          {String(index + 1).padStart(2, "0")}
+                        </TableCell>
+                        <TableCell className="max-w-0">
+                          <div className="flex items-center gap-2.5">
+                            <span
+                              aria-hidden
+                              className={cn(
+                                "size-1.5 shrink-0 transition-colors",
+                                shown ? "bg-signal" : "bg-hairline group-hover/row:bg-signal-dim",
+                              )}
+                            />
+                            <span
+                              title={item.name}
+                              className="truncate font-medium text-bone transition-colors group-hover/row:text-signal"
+                            >
+                              {item.name}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            data-testid={`value-${item.name}`}
+                            className={cn(
+                              "font-mono text-[0.8rem] tracking-[0.12em]",
+                              shown ? "text-signal" : "text-bone-faint/80",
+                            )}
+                          >
+                            {shown ? (
+                              <span className="line-clamp-2 break-all whitespace-pre-wrap">{item.value}</span>
+                            ) : (
+                              MASK
+                            )}
+                          </span>
+                          {shown && lines > 2 && <span className="text-xs text-bone-faint"> +{lines - 2} more lines</span>}
+                        </TableCell>
+                        <TableCell className="pr-3">
+                          <div className="flex justify-end gap-0.5 opacity-70 transition-opacity group-hover/row:opacity-100 group-focus-within/row:opacity-100">
+                            <IconAction label={shown ? "Hide value" : "Reveal value"} pressed={shown} onClick={() => setRevealed(flip(revealed, item.id))}>
+                              {shown ? <EyeOff /> : <Eye />}
+                            </IconAction>
+                            <IconAction label="Copy value" onClick={() => void copyText(item.id, item.value)}>
+                              {copied === item.id ? <Check className="text-signal" /> : <Copy />}
+                            </IconAction>
+                            <DropdownMenu>
+                              <Tooltip>
+                                <TooltipTrigger
+                                  render={
+                                    <DropdownMenuTrigger
+                                      render={<Button type="button" variant="ghost" size="icon-sm" className="[&_svg]:size-4" aria-label={`More actions for ${item.name}`} />}
+                                    />
+                                  }
+                                >
+                                  <Ellipsis />
+                                </TooltipTrigger>
+                                <TooltipContent>More</TooltipContent>
+                              </Tooltip>
+                              <DropdownMenuContent align="end">
+                                {canWrite && (
+                                  <DropdownMenuItem onClick={() => setEditing(editing === item.id ? null : item.id)}>
+                                    <Pencil /> Edit
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem onClick={() => setHistoryOf(item)}>
+                                  <History /> History
+                                </DropdownMenuItem>
+                                {canWrite && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem variant="destructive" onClick={() => setDeleting([item])}>
+                                      <Trash2 /> Delete
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </TableCell>
                       </TableRow>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </TableBody>
-          </Table>
+                      {editing === item.id && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="whitespace-normal">
+                            <SecretEditor
+                              item={item}
+                              envId={envId}
+                              keyVersion={keyVersion}
+                              keys={keys}
+                              others={new Set([...names].filter((n) => n !== item.name))}
+                              onSaved={(next) => {
+                                upsert(next);
+                                setEditing(null);
+                              }}
+                              onGone={() => {
+                                removeMany(new Set([item.id]));
+                                setEditing(null);
+                              }}
+                              onCancel={() => setEditing(null)}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline-faint px-5 py-3 text-[0.65rem] uppercase tracking-[0.18em] text-bone-faint">
+              <span className="flex items-center gap-2">
+                <span aria-hidden className="size-1 bg-signal/70" />
+                {filter
+                  ? `${visible.length} of ${items.length} ${items.length === 1 ? "entry" : "entries"}`
+                  : `${items.length} ${items.length === 1 ? "entry" : "entries"}`}
+              </span>
+              <span>AES-256-GCM / sealed in this browser</span>
+            </div>
+          </>
         )}
 
         {ready && loaded.unreadable.length > 0 && (
-          <div className="mt-3 flex flex-col gap-2">
+          <div className="flex flex-col gap-2 px-5 pb-4 pt-3">
             {loaded.unreadable.map((u) => (
               <Alert key={u.id} variant="destructive">
                 <AlertDescription>A secret in this environment {u.reason}. It is still stored, untouched.</AlertDescription>

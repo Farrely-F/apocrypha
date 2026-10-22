@@ -21,20 +21,23 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "relative isolate mt-5 grid min-h-[22rem] place-items-center overflow-hidden border border-hairline-faint px-6 py-12 text-center",
+        "relative isolate grid min-h-[24rem] place-items-center overflow-hidden px-6 py-12 text-center",
         className,
       )}
     >
-      <div aria-hidden className="mora-tex-ink-painted absolute inset-0 -z-20 opacity-60" />
-      <div
-        aria-hidden
-        className="absolute inset-0 -z-10 [background:radial-gradient(ellipse_55%_60%_at_50%_38%,color-mix(in_oklch,var(--lamp)_9%,transparent),transparent_70%),radial-gradient(ellipse_80%_80%_at_50%_50%,oklch(0.14_0.012_195/0.2),oklch(0.14_0.012_195/0.85))]"
-      />
-      <div className="grid justify-items-center gap-3">
-        <EmptyArt className="w-32" />
-        <h3 className="mt-3 text-lg text-bone">{title}</h3>
-        <p className="max-w-[46ch] text-bone-dim">{children}</p>
-        {actions && <div className="mt-3 flex flex-wrap justify-center gap-2">{actions}</div>}
+      <div className="relative grid w-full max-w-[34rem] justify-items-center gap-6 text-center">
+        <div className="relative">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -inset-12 [background:radial-gradient(ellipse_at_center,color-mix(in_oklch,var(--lamp)_7%,transparent),transparent_68%)]"
+          />
+          <EmptyArt className="relative w-40" />
+        </div>
+        <div className="grid justify-items-center gap-3">
+          <h3 className="font-display text-2xl leading-none text-bone">{title}</h3>
+          <p className="max-w-[48ch] text-sm text-bone-dim">{children}</p>
+          {actions && <div className="mt-1 flex flex-wrap justify-center gap-2">{actions}</div>}
+        </div>
       </div>
     </div>
   );

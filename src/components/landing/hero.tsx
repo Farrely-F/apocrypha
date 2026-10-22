@@ -6,6 +6,7 @@ import { motion, useScroll, useTransform } from "motion/react";
 import { useReducedMotion } from "./use-reduced-motion";
 import { buttonVariants } from "@/components/ui/button";
 import { HeroTerminal } from "./hero-terminal";
+import { useSignedIn } from "./use-signed-in";
 
 /**
  * The first screen. The painting behind it is the page-wide ground (see
@@ -15,6 +16,7 @@ import { HeroTerminal } from "./hero-terminal";
 export function Hero({ repo }: { repo: string }) {
   const ref = useRef<HTMLElement>(null);
   const reduce = useReducedMotion();
+  const signedIn = useSignedIn();
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
 
   const textY = useTransform(scrollYProgress, [0, 1], ["0%", reduce ? "0%" : "-12%"]);
@@ -53,8 +55,8 @@ export function Hero({ repo }: { repo: string }) {
           server stores ciphertext and can&apos;t read it.
         </p>
         <div className="mt-9 flex flex-wrap items-center gap-3">
-          <Link href="/sign-in" className={buttonVariants({ size: "lg" })}>
-            Sign in with GitHub
+          <Link href={signedIn ? "/dashboard" : "/sign-in"} className={buttonVariants({ size: "lg" })}>
+            {signedIn ? "Open your dashboard" : "Sign in with GitHub"}
           </Link>
           <a href={repo} className={buttonVariants({ variant: "outline", size: "lg" })}>
             Read the source

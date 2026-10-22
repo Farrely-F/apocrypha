@@ -1,61 +1,54 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
-import { ChevronRight } from "lucide-react";
-import { Pane } from "@/components/shell";
-
-export type Crumb = { label: string; href?: string };
 
 /**
- * The frame shared by the org, project and environment lists: breadcrumb and a
- * display title across the top, the list in a pane on the left, and a rail of
- * notes on the right so the width is used for something.
+ * The frame shared by the org and project lists. One title, one line of
+ * context, one action. The table below carries the rest; no duplicated
+ * breadcrumb, chapter number, or tutorial rail.
  */
 export function ListView({
-  crumbs,
   title,
   summary,
-  rail,
+  actions,
   children,
 }: {
-  crumbs: Crumb[];
   title: string;
   summary?: ReactNode;
-  rail: ReactNode;
+  actions?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <div className="mx-auto grid max-w-[96rem] gap-x-6 gap-y-6 pt-2 lg:grid-cols-[minmax(0,1fr)_21rem]">
-      <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3 border-b border-hairline-faint pb-5 lg:col-span-full">
+    <div className="mx-auto w-full max-w-[100rem] pb-10 pt-1">
+      <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 pb-6">
         <div className="min-w-0">
-          <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1.5 text-sm text-bone-faint">
-            {crumbs.map((c, i) => (
-              <span key={c.label} className="flex items-center gap-1.5">
-                {i > 0 && <ChevronRight aria-hidden className="size-3" />}
-                {c.href ? (
-                  <Link href={c.href} className="transition-colors hover:text-signal">
-                    {c.label}
-                  </Link>
-                ) : (
-                  <span>{c.label}</span>
-                )}
-              </span>
-            ))}
-          </nav>
-          <h1 className="mt-1 truncate font-display text-4xl leading-none text-bone">{title}</h1>
+          <h1 className="truncate font-display text-[clamp(3.5rem,7vw,6.5rem)] leading-[0.8] font-semibold tracking-[-0.015em] text-bone">
+            {title}
+          </h1>
+          {summary && <p className="mt-3 max-w-[70ch] text-sm text-bone-dim">{summary}</p>}
         </div>
-        {summary && <p className="text-xs text-bone-dim">{summary}</p>}
+        {actions && <div className="flex shrink-0 flex-wrap items-center gap-2 pb-1">{actions}</div>}
       </header>
-      {children}
-      <aside className="grid content-start gap-6 lg:sticky lg:top-0">{rail}</aside>
+
+      <div className="mt-6 min-w-0">{children}</div>
     </div>
   );
 }
 
-/** One notched pane of notes for the rail. */
-export function RailNote({ title, children }: { title: string; children: ReactNode }) {
+/** One quiet line of provenance under a catalogue table. */
+export function LedgerFoot({ children, meta }: { children: ReactNode; meta?: ReactNode }) {
   return (
-    <Pane title={title}>
-      <div className="grid gap-2 text-sm text-bone-dim">{children}</div>
-    </Pane>
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline-faint px-5 py-3 text-[0.66rem] uppercase tracking-[0.18em] text-bone-faint">
+      <span>{children}</span>
+      {meta && <span className="text-signal-dim">{meta}</span>}
+    </div>
   );
 }
+
+/** Shared classes for the catalogue tables, so the two lists stay siblings. */
+export const catalogue = {
+  head: "h-9 text-[0.65rem] font-normal uppercase tracking-[0.2em] text-bone-faint",
+  row: "group/row h-14 border-hairline-faint transition-colors hover:bg-pane/45",
+  name: "text-bone transition-colors group-hover/row:text-signal",
+  quiet: "text-bone-dim",
+  chevron:
+    "flex size-7 items-center justify-center border border-transparent text-bone-faint transition-colors group-hover/row:border-hairline-faint group-hover/row:text-signal",
+} as const;

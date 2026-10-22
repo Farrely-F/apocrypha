@@ -11,18 +11,19 @@ type ShellHeaderProps = {
   className?: string;
 };
 
-/** Header pane: wordmark in the display face, nav and actions as slots. */
+/** Header: wordmark in the display face, nav and actions as slots. */
 export function ShellHeader({ nav, actions, className }: ShellHeaderProps) {
   return (
     <header
       className={cn(
-        "relative flex h-12 items-stretch border-b border-hairline bg-background",
+        "relative flex h-12 items-stretch",
         className,
       )}
     >
-      <Link
-        href="/"
-        className="group flex shrink-0 items-center gap-2.5 border-r border-hairline-faint px-3 sm:px-4 font-display text-[1.75rem] leading-none text-bone transition-colors hover:text-signal"
+      <div className="mx-auto flex w-full max-w-[calc(100rem+3rem)] items-stretch px-4 sm:px-6">
+        <Link
+        href="/dashboard"
+        className="group flex shrink-0 items-center gap-2.5 font-display text-[1.75rem] leading-none text-bone transition-colors hover:text-signal"
       >
         <Seal title="" aria-hidden className="size-6 text-signal-dim transition-colors group-hover:text-signal" />
         <span className="hidden sm:inline">Apocrypha</span>
@@ -35,7 +36,8 @@ export function ShellHeader({ nav, actions, className }: ShellHeaderProps) {
           {nav}
         </nav>
       )}
-      <div className="ml-auto flex shrink-0 items-center gap-2 px-2 sm:px-3">{actions}</div>
+        <div className="ml-auto flex shrink-0 items-center gap-2 pl-2 sm:pl-3">{actions}</div>
+      </div>
     </header>
   );
 }

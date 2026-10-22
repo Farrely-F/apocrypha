@@ -12,6 +12,7 @@ import {
 import { Seal } from "@/components/brand/seal";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useSignedIn } from "./use-signed-in";
 
 export const CHAPTERS = [
   { id: "holds", label: "What we hold" },
@@ -30,6 +31,7 @@ export function LandingHeader({ repo }: { repo: string }) {
   const [pill, setPill] = useState(false);
   const [late, setLate] = useState(false);
   const [active, setActive] = useState<string | null>(null);
+  const signedIn = useSignedIn();
   const { scrollY } = useScroll();
 
   useMotionValueEvent(scrollY, "change", (y) => {
@@ -139,16 +141,16 @@ export function LandingHeader({ repo }: { repo: string }) {
             <ArrowUpRight className="size-3 transition-transform group-hover/src:translate-x-px group-hover/src:-translate-y-px" />
           </a>
           <Link
-            href="/sign-in"
+            href={signedIn ? "/dashboard" : "/sign-in"}
             className={cn(
               buttonVariants({
-                variant: late ? "default" : "ghost",
+                variant: late || signedIn ? "default" : "ghost",
                 size: "sm",
               }),
               "rounded-full px-4",
             )}
           >
-            Sign in
+            {signedIn ? "Dashboard" : "Sign in"}
           </Link>
         </div>
       </div>
