@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { ShellHeader } from "@/components/shell";
+import { AuthStage } from "@/components/shell";
 import { testAuthEnabled } from "@/lib/auth/auth";
 import { signInErrorMessage } from "@/lib/auth/errors";
 import { getSession } from "@/lib/auth/session";
@@ -27,13 +27,10 @@ export const instant = false;
 
 export default function SignInPage({ searchParams }: { searchParams: Promise<{ error?: string | string[] }> }) {
   return (
-    <div className="flex min-h-dvh flex-col bg-background">
-      <ShellHeader />
-      <main id="main" className="relative flex flex-1 flex-col">
-        <Suspense fallback={null}>
-          <Gate searchParams={searchParams} />
-        </Suspense>
-      </main>
-    </div>
+    <AuthStage>
+      <Suspense fallback={null}>
+        <Gate searchParams={searchParams} />
+      </Suspense>
+    </AuthStage>
   );
 }

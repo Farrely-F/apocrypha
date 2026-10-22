@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
-import FaultyTerminal from "@/components/FaultyTerminal";
 import { Pane } from "@/components/shell";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -16,9 +15,9 @@ import { devSignInSchema, type DevSignInValues } from "@/lib/auth/schemas";
 
 /**
  * The gate for people who are signed out. Signing in proves who you are; the
- * vault passphrase, asked for next, is what opens your secrets. FaultyTerminal
- * is the backdrop (effects on landing and the gates only), dim and behind a
- * solid pane so the form stays readable.
+ * vault passphrase, asked for next, is what opens your secrets. The backdrop
+ * is the painted library (AuthGround), behind a solid pane so the form stays
+ * readable.
  */
 export function SignInScreen({
   githubEnabled,
@@ -47,28 +46,8 @@ export function SignInScreen({
   const shown = githubError ?? error;
 
   return (
-    <div className="relative grid flex-1 place-items-center overflow-hidden px-4 py-10">
-      <div aria-hidden className="absolute inset-0 z-0">
-        <FaultyTerminal
-          tint="#3ddc97"
-          glyphs="characters"
-          brightness={0.6}
-          scanlineIntensity={0.35}
-          curvature={0.1}
-          glow={0.35}
-          vignette={0.6}
-          digitSize={3}
-          timeScale={0.2}
-          mouseReact={false}
-          clickEffect="none"
-          variation={undefined}
-          dpr={undefined}
-          style={undefined}
-        />
-      </div>
-
-      <div className="relative z-10 w-full max-w-md">
-        <Pane title="Sign in" meta="step 1 of 2" className="bg-background">
+    <div className="w-full max-w-md">
+        <Pane title="Sign in" meta="step 1 of 2" className="mora-frame-corners bg-background">
           <p className="text-bone-dim">
             Signing in proves who you are. Next you&apos;ll enter your vault passphrase, which is what opens your
             secrets. We never see it.
@@ -97,14 +76,13 @@ export function SignInScreen({
           {testAuth && <DevSignIn />}
         </Pane>
 
-        <p className="mt-4 bg-background/80 py-1 text-center text-xs text-bone-faint">
+        <p className="mt-4 text-xs text-bone-faint">
           New here? Signing in creates your account.{" "}
           <Link href="/" className="text-bone-dim underline underline-offset-4 hover:text-signal">
             What is Apocrypha
           </Link>
           . Early development, unaudited.
         </p>
-      </div>
     </div>
   );
 }

@@ -37,6 +37,10 @@ function Frame({ email, tree, children }: { email: string; tree: TreeOrg[]; chil
   const unlocked = status === "unlocked";
   const [info, setInfo] = useState<Info>({});
 
+  // Locked, the whole page is the gate, the same one as sign-in: no app chrome behind it.
+  if (status === "locked") return <UnlockScreen email={email} />;
+  if (!unlocked) return <div className="h-dvh bg-background" />;
+
   return (
     <div className="flex h-dvh flex-col bg-background">
       <ShellHeader
@@ -49,13 +53,9 @@ function Frame({ email, tree, children }: { email: string; tree: TreeOrg[]; chil
         }
       />
       <div id="main" className="min-h-0 flex-1 overflow-y-auto">
-        {unlocked ? (
-          <InfoContext.Provider value={setInfo}>
-            <div className="p-4 sm:p-6">{children}</div>
-          </InfoContext.Provider>
-        ) : status === "locked" ? (
-          <UnlockScreen email={email} />
-        ) : null}
+        <InfoContext.Provider value={setInfo}>
+          <div className="p-4 sm:p-6">{children}</div>
+        </InfoContext.Provider>
       </div>
       <StatusBar
         org={unlocked ? info.org : null}

@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
-import FaultyTerminal from "@/components/FaultyTerminal";
-import { Pane } from "@/components/shell";
+import { AuthStage, Pane } from "@/components/shell";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -104,31 +103,12 @@ export function UnlockScreen({ email }: { email: string }) {
   }
 
   return (
-    <div className="relative grid min-h-full place-items-center overflow-hidden px-4 py-10">
-      <div aria-hidden className="absolute inset-0 z-0">
-        <FaultyTerminal
-          tint="#3ddc97"
-          glyphs="characters"
-          brightness={0.6}
-          scanlineIntensity={0.35}
-          curvature={0.1}
-          glow={0.35}
-          vignette={0.6}
-          digitSize={3}
-          timeScale={0.2}
-          mouseReact={false}
-          clickEffect="none"
-          variation={undefined}
-          dpr={undefined}
-          style={undefined}
-        />
-      </div>
-
+    <AuthStage>
       {recovering && load.kind === "ready" ? (
         <RecoveryForm email={email} me={load.me} onBack={() => setRecovering(false)} onUnlocked={(kp) => unlock(kp, { trusted: false })} />
       ) : (
-      <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="relative z-10 w-full max-w-md">
-        <Pane title="Vault locked" meta={email} className="bg-background">
+      <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="w-full max-w-md">
+        <Pane title="Vault locked" meta={email} className="mora-frame-corners bg-background">
           <p className="text-bone-dim">
             Enter your vault passphrase. It opens a key that stays in this
             browser and never leaves it.
@@ -203,6 +183,6 @@ export function UnlockScreen({ email }: { email: string }) {
         </Pane>
       </form>
       )}
-    </div>
+    </AuthStage>
   );
 }

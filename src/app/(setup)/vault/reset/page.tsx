@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { AppShell, ShellHeader, StatusBar } from "@/components/shell";
+import { AuthStage } from "@/components/shell";
 import { requireSession } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
 import { getVaultRecord } from "@/lib/vault/store";
@@ -13,9 +13,9 @@ async function Gate() {
   const { user } = await requireSession();
   if (!(await getVaultRecord(db, user.id))) redirect("/vault/new");
   return (
-    <AppShell header={<ShellHeader />} status={<StatusBar lock="locked" />}>
+    <AuthStage wide>
       <ResetFlow email={user.email} />
-    </AppShell>
+    </AuthStage>
   );
 }
 

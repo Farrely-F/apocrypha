@@ -256,6 +256,33 @@
   pointer-events: none;
 }
 
+/* The painted ground behind the gates. Slow drift, dark where the form sits. */
+@keyframes auth-drift {
+  from { transform: scale(1.04) translate3d(0, 0, 0); }
+  to { transform: scale(1.12) translate3d(-1.5%, -1%, 0); }
+}
+
+.auth-ground {
+  background: url("/brand/hero-library.webp") 80% center / cover no-repeat;
+  animation: auth-drift 70s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.auth-scrim {
+  background:
+    linear-gradient(to bottom, oklch(0.14 0.012 195 / 0.85), oklch(0.14 0.012 195 / 0.5) 60%, oklch(0.14 0.012 195 / 0.8)),
+    radial-gradient(ellipse at center, transparent 40%, oklch(0.11 0.012 195 / 0.7));
+}
+
+@media (min-width: 64rem) {
+  .auth-ground { background-position: 72% center; }
+  .auth-scrim {
+    background:
+      linear-gradient(to right, oklch(0.14 0.012 195 / 0.92), oklch(0.14 0.012 195 / 0.6) 42%, oklch(0.14 0.012 195 / 0.12)),
+      linear-gradient(to top, oklch(0.14 0.012 195 / 0.7), transparent 35%);
+  }
+}
+
 .mora-flicker {
   animation: mora-flicker 280ms steps(1, end) 1;
 }

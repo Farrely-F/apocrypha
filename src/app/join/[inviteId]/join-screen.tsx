@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AuthStage, Pane } from "@/components/shell";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { openInvite, readFragment } from "@/lib/invites/link";
@@ -76,9 +77,10 @@ export function JoinScreen({ inviteId }: { inviteId: string }) {
   }
 
   return (
-    <main className="mx-auto grid min-h-dvh max-w-md place-content-center gap-4 px-4">
-      <div className="grid gap-4 border p-6">
-        <h1 className="text-lg">{state === "ready" || state === "joining" ? `Join ${offer?.orgName}` : "Invitation"}</h1>
+    <AuthStage>
+      <Pane title="Invitation" className="mora-frame-corners w-full max-w-md">
+      <div className="grid gap-4">
+        {(state === "ready" || state === "joining") && <h1 className="text-lg text-bone">{`Join ${offer?.orgName}`}</h1>}
         {state === "loading" && <p className="text-bone-faint">Checking the invite...</p>}
         {state === "signin" && (
           <>
@@ -113,6 +115,7 @@ export function JoinScreen({ inviteId }: { inviteId: string }) {
           </>
         )}
       </div>
-    </main>
+      </Pane>
+    </AuthStage>
   );
 }
