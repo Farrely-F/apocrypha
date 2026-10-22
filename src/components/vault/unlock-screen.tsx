@@ -28,6 +28,23 @@ const idleLabel =
     : `${Math.round(IDLE_TIMEOUT_MS / 1000)}-second`;
 const trustDays = Math.round(TRUST_TTL_MS / 86_400_000);
 
+/**
+ * Why an unlock failed. Only a failed decryption is "wrong passphrase"; a browser that
+ * cannot do the maths is a different problem, and blaming the passphrase hides it.
+ */
+function unlockFailure(err: unknown): string {
+  if (typeof window !== "undefined" && (!window.isSecureContext || !globalThis.crypto?.subtle)) {
+    return "This page is not a secure context, so the browser turns off the cryptography the vault needs. Open the site over https (or localhost).";
+  }
+  if (err instanceof CryptoError) {
+    if (err.code === "unsupported") {
+      return "Your passphrase is right, but this browser cannot load your vault key (it needs X25519: iOS and Safari 17 or newer, or a recent Chrome or Firefox). Update the browser or iOS, or unlock from another browser.";
+    }
+    return WRONG;
+  }
+  return "This browser could not check the passphrase. It needs about 64 MB of free memory: close other tabs and try again.";
+}
+
 type Me = { publicKey: string; passphraseBlob: string };
 type Load = { kind: "loading" } | { kind: "ready"; me: Me } | { kind: "error" };
 
@@ -72,27 +89,31 @@ export function UnlockScreen({ email }: { email: string }) {
     if (ready) form.setFocus("passphrase");
   }, [ready, form]);
 
+  function fail(message: string) {
+    setAttempt((n) => n + 1);
+    form.setValue("passphrase", "");
+    form.setError("passphrase", { type: "server", message });
+    form.setFocus("passphrase");
+  }
+
   async function onSubmit(values: UnlockValues) {
     if (load.kind !== "ready") return;
     // Let "Unlocking" paint before Argon2id occupies the main thread.
     await new Promise((r) => setTimeout(r, 40));
+    let keyPair;
     try {
-      const keyPair = await unlockVault(load.me.passphraseBlob, values.passphrase);
+      keyPair = await unlockVault(load.me.passphraseBlob, values.passphrase);
       // The unlocked key must be the one the server holds the public half of.
       if (keyPair.publicKey !== load.me.publicKey) throw new CryptoError("decryption-failed", "mismatch");
+    } catch (err) {
+      fail(unlockFailure(err));
+      return;
+    }
+    try {
       await unlock(keyPair, { trusted: values.trust });
       form.resetField("passphrase");
-    } catch (err) {
-      setAttempt((n) => n + 1);
-      form.setValue("passphrase", "");
-      form.setError("passphrase", {
-        type: "server",
-        message:
-          err instanceof CryptoError
-            ? WRONG
-            : "This browser could not store the unlocked key. Check that site storage is not blocked, then try again.",
-      });
-      form.setFocus("passphrase");
+    } catch {
+      fail("This browser could not store the unlocked key. Check that site storage is not blocked, then try again.");
     }
   }
 

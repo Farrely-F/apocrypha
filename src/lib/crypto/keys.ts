@@ -91,6 +91,11 @@ export async function importKeyPair(
   opts: { extractable?: boolean } = {},
 ): Promise<KeyPair> {
   const p = params(alg);
+  // A key made in a browser with X25519 cannot be opened in one without it. Say so,
+  // instead of reporting a good passphrase as a damaged key.
+  if (alg === "x25519" && !(await supportsX25519())) {
+    throw new CryptoError("unsupported", "X25519 is not supported by this runtime");
+  }
   let probe: CryptoKey;
   let jwk: JsonWebKey;
   try {

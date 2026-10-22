@@ -20,7 +20,7 @@ import {
   randomBytes,
   utf8,
 } from "./encoding";
-import { authFailed, invalid, malformed } from "./errors";
+import { authFailed, CryptoError, invalid, malformed } from "./errors";
 import { aesGcmOpen, aesGcmSeal, hkdfSha256, IV_BYTES, KEY_BYTES } from "./primitives";
 import { exportPrivateKey, generateKeyPair, importKeyPair, type KeyAlg, type KeyPair } from "./keys";
 
@@ -241,11 +241,25 @@ export async function createVault(
   }
 }
 
+/**
+ * The blob has already authenticated, so the passphrase was right: if the key
+ * still will not load, this runtime cannot handle it (X25519 on an older
+ * browser). Say that instead of letting it look like a wrong passphrase.
+ */
+async function importLoadedKey(pkcs8: Uint8Array, alg: KeyAlg): Promise<KeyPair> {
+  try {
+    return await importKeyPair(pkcs8, alg);
+  } catch (e) {
+    if (e instanceof CryptoError && e.code === "unsupported") throw e;
+    throw new CryptoError("unsupported", "this runtime could not load the vault key");
+  }
+}
+
 /** Unlock with the passphrase. Throws a generic CryptoError if it is wrong. */
 export async function unlockVault(passphraseBlob: string, passphrase: string): Promise<KeyPair> {
   const { pkcs8, alg } = await openWithPassphrase(passphraseBlob, passphrase);
   try {
-    return await importKeyPair(pkcs8, alg as KeyAlg);
+    return await importLoadedKey(pkcs8, alg as KeyAlg);
   } finally {
     wipe(pkcs8);
   }
@@ -258,7 +272,7 @@ export async function unlockVaultWithRecoveryKey(
 ): Promise<KeyPair> {
   const { pkcs8, alg } = await openWithRecoveryKey(recoveryBlob, recoveryKey);
   try {
-    return await importKeyPair(pkcs8, alg as KeyAlg);
+    return await importLoadedKey(pkcs8, alg as KeyAlg);
   } finally {
     wipe(pkcs8);
   }
