@@ -29,13 +29,14 @@ export async function hit(db: Db, key: string, limit: number, windowMs: number, 
 /**
  * The client address as added by our own reverse proxies, or null when it cannot be trusted. A client
  * can put anything at the front of X-Forwarded-For, so we count `hops` entries in from the right (the
- * ones our proxies appended). With hops set to 0 there is no trusted source, and per-address limits
- * are skipped rather than lumping everyone into one shared bucket.
+ * ones our proxies appended). With hops set to 0, or fewer entries than hops (no proxy in front), there
+ * is no trusted source and this returns null; callers that must still be bounded then use a shared bucket.
  */
 export function clientKey(request: Request, hops = Number(process.env.TRUSTED_PROXY_HOPS ?? 1)): string | null {
   if (!Number.isInteger(hops) || hops < 1) return null;
   const parts = (request.headers.get("x-forwarded-for") ?? "").split(",").map((p) => p.trim()).filter(Boolean);
-  return parts.length >= hops ? parts[parts.length - hops] : request.headers.get("x-real-ip") || null;
+  // No X-Real-IP fallback: without a proxy in front, any client header is the client's own word.
+  return parts.length >= hops ? parts[parts.length - hops] : null;
 }
 
 export const tooMany = (retryAfterSeconds: number) =>

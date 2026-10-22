@@ -51,7 +51,9 @@ It stops script that someone injects into a page (a cross-site-scripting bug, a 
 | Creating invites, share links | 30, 60 / hour | signed-in user |
 | Redeeming an invite, opening a share link | 20 / minute, 30 / minute | user or address |
 
-Counters live in the database (`rate_limit`), so they survive restarts. The client address is the one **your** reverse proxy appended to `X-Forwarded-For`, counted in from the right by `TRUSTED_PROXY_HOPS` (default 1), because a client can write anything at the front of that header. With `TRUSTED_PROXY_HOPS=0` there is no trusted address, and per-address limits are skipped rather than lumping everyone together. The two-factor plugin also locks an account after repeated wrong codes.
+Counters live in the database (`rate_limit`), so they survive restarts. The client address is the one **your** reverse proxy appended to `X-Forwarded-For`, counted in from the right by `TRUSTED_PROXY_HOPS` (default 1), because a client can write anything at the front of that header. `X-Real-IP` and every other client header are ignored: without a proxy in front they are only the client's word.
+
+When there is no trusted address (no proxy in front, or `TRUSTED_PROXY_HOPS=0`), the auth routes fall back to one shared bucket per kind of request, ten times or more higher than the per-address limit (second factor 120/min, sign-in 300/min), so abuse is still bounded instead of unlimited, at the cost that under attack everyone shares it. Code guessing is also counted **per pending challenge** (a hash of the server-issued second-factor cookie, 10/min), which holds however many addresses a guesser claims, and the two-factor plugin locks an account after repeated wrong codes.
 
 ## Verify it yourself
 

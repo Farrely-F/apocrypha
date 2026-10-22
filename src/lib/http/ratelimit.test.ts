@@ -42,6 +42,11 @@ describe("rate limit", () => {
     expect(clientKey(req("6.6.6.6, 1.2.3.4"), 1)).toBe("1.2.3.4"); // the client lied at the front; the proxy appended the real address
     expect(clientKey(req("6.6.6.6, 1.2.3.4, 10.0.0.1"), 2)).toBe("1.2.3.4");
     expect(clientKey(req(), 1)).toBeNull(); // no header: no shared "unknown" bucket
+    // With no proxy in front, X-Real-IP is only the client's word, so it is never believed.
+    const spoof = new Request("http://x", { headers: { "x-real-ip": "9.9.9.9" } });
+    expect(clientKey(spoof, 1)).toBeNull();
+    const short = new Request("http://x", { headers: { "x-forwarded-for": "1.2.3.4", "x-real-ip": "9.9.9.9" } });
+    expect(clientKey(short, 2)).toBeNull(); // fewer entries than trusted hops: not trusted either
     expect(clientKey(req("1.2.3.4"), 0)).toBeNull(); // no trusted proxy configured: ignore the header entirely
   });
 
