@@ -40,7 +40,7 @@ It stops script that someone injects into a page (a cross-site-scripting bug, a 
 
 | Where | Limit | Key |
 | --- | --- | --- |
-| Second-factor code and backup-code checks | 10 / minute | client address |
+| Second-factor code and backup-code checks | 10 / minute per trusted address, plus 5 per challenge and 10 per account before a 15-minute lock | address, challenge, account |
 | Sign-in, sign-up, password reset | 20 / minute | client address |
 | Provider sign-in callback | 30 / minute | client address |
 | Link, unlink, 2FA changes, profile | 30 / minute | client address |
@@ -53,7 +53,9 @@ It stops script that someone injects into a page (a cross-site-scripting bug, a 
 
 Counters live in the database (`rate_limit`), so they survive restarts. The client address is the one **your** reverse proxy appended to `X-Forwarded-For`, counted in from the right by `TRUSTED_PROXY_HOPS` (default 1), because a client can write anything at the front of that header. `X-Real-IP` and every other client header are ignored: without a proxy in front they are only the client's word.
 
-When there is no trusted address (no proxy in front, or `TRUSTED_PROXY_HOPS=0`), the auth routes fall back to one shared bucket per kind of request, ten times or more higher than the per-address limit (second factor 120/min, sign-in 300/min), so abuse is still bounded instead of unlimited, at the cost that under attack everyone shares it. Code guessing is also counted **per pending challenge** (a hash of the server-issued second-factor cookie, 10/min), which holds however many addresses a guesser claims, and the two-factor plugin locks an account after repeated wrong codes.
+When there is no trusted address (no proxy in front, or `TRUSTED_PROXY_HOPS=0`), there is no per-address limit, and deliberately no shared bucket in its place, because a shared bucket lets one client lock everyone else out of signing in. **If the container is reachable directly with the default `TRUSTED_PROXY_HOPS=1`, a client can write its own `X-Forwarded-For` and pick its address**; set it to `0` there (the supported setup is behind a reverse proxy, since the vault needs https).
+
+Nothing that stops code guessing depends on the address or on any header the client controls. The two-factor plugin counts wrong codes per pending challenge (the signed, server-issued cookie it validates itself) and per account across challenges: after 10 consecutive failures the account is locked for 15 minutes, and even the right code is refused. `accountLockout` is set explicitly in `src/lib/auth/auth.ts`, and `two-factor-gate.test.ts` drives it with a different address, a spoofed header and a decoy cookie on every guess.
 
 ## Verify it yourself
 

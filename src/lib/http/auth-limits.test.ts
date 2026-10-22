@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { beforeAll, describe, expect, it } from "vitest";
-import { authRule, challengeBucket } from "./auth-limits";
+import { authRule } from "./auth-limits";
 
 describe("which auth requests are counted", () => {
   it("counts code guessing hardest, then sign-in, then everything else that writes", () => {
@@ -19,19 +19,6 @@ describe("which auth requests are counted", () => {
   it("leaves reads alone, so the session check the client polls is never refused", () => {
     expect(authRule("GET", "/api/auth/get-session")).toBeNull();
     expect(authRule("GET", "/api/auth/list-sessions")).toBeNull();
-  });
-});
-
-describe("the challenge a request answers", () => {
-  const withCookie = (cookie: string) => new Request("http://x/api/auth/two-factor/verify-totp", { headers: { cookie } });
-  it("is named by a hash of the challenge cookie, plain or with the secure prefix", () => {
-    const a = challengeBucket(withCookie("better-auth.two_factor=abc.def; other=1"));
-    const b = challengeBucket(withCookie("__Secure-better-auth.two_factor=abc.def"));
-    expect(a).toMatch(/^auth-challenge:[0-9a-f]{32}$/);
-    expect(a).toBe(b);
-    expect(a).not.toContain("abc"); // the cookie value itself is never stored
-    expect(challengeBucket(withCookie("better-auth.two_factor=other"))).not.toBe(a);
-    expect(challengeBucket(withCookie("session=1"))).toBeNull();
   });
 });
 
@@ -68,31 +55,21 @@ describe("the sign-in routes, per client address", () => {
     expect(Number(res.headers.get("retry-after"))).toBeGreaterThan(0);
   });
 
-  it("is not dodged with X-Real-IP when there is no proxy in front: a shared bucket still bounds it", async () => {
-    // No X-Forwarded-For at all, and a different X-Real-IP every time: no address can be trusted.
-    const spoofed = (i: number) =>
-      new Request("http://localhost:3000/api/auth/sign-in/email", {
-        method: "POST",
-        headers: { "content-type": "application/json", origin: "http://localhost:3000", "x-real-ip": `198.51.100.${i % 250}` },
-        body: JSON.stringify({ email: "a@b.co", password: "x" }),
-      });
+  it("has no shared bucket when no address can be trusted, so one client cannot lock everyone else out", async () => {
+    // No X-Forwarded-For, and a different X-Real-IP every time: nothing here is believed, so nothing is counted.
+    // (Code guessing is bounded without any address: see the two-factor tests in auth/two-factor-gate.test.ts.)
     let refused = 0;
-    for (let i = 0; i < 305; i++) if ((await POST(spoofed(i))).status === 429) refused++;
-    // Past the shared limit (300 a minute) it refuses, however many addresses it claims to be.
-    expect(refused).toBeGreaterThan(0);
-  }, 60_000);
-
-  it("counts code guesses per pending challenge, whatever addresses they come from", async () => {
-    const guess = (ip: string) =>
-      new Request("http://localhost:3000/api/auth/two-factor/verify-totp", {
-        method: "POST",
-        headers: { "content-type": "application/json", origin: "http://localhost:3000", "x-forwarded-for": ip, cookie: "better-auth.two_factor=signed-challenge-token.sig" },
-        body: JSON.stringify({ code: "000000" }),
-      });
-    const statuses: number[] = [];
-    for (let i = 0; i < 12; i++) statuses.push((await POST(guess(`192.0.2.${i + 1}`))).status); // a new address every time
-    expect(statuses.slice(0, 10).every((s) => s !== 429)).toBe(true);
-    expect(statuses[10]).toBe(429);
+    for (let i = 0; i < 60; i++) {
+      const res = await POST(
+        new Request("http://localhost:3000/api/auth/sign-in/email", {
+          method: "POST",
+          headers: { "content-type": "application/json", origin: "http://localhost:3000", "x-real-ip": `198.51.100.${i}` },
+          body: JSON.stringify({ email: "a@b.co", password: "x" }),
+        }),
+      );
+      if (res.status === 429) refused++;
+    }
+    expect(refused).toBe(0);
   });
 
   it("refuses the 21st sign-in attempt in a minute", async () => {

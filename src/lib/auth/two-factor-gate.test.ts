@@ -354,3 +354,92 @@ describe("deleting an organisation over HTTP", () => {
     expect(await exists()).toBe(0);
   });
 });
+
+describe("guessing second-factor codes is bounded whatever address or headers the guesser uses", () => {
+  const SUB = "g-guess";
+  const MAIL = "guess@example.com";
+  let uri = "";
+
+  // The guesser never ends up with a session of their own.
+  const sessionsOfGuesser = async () => {
+    const [u] = await db.select().from(schema.user).where(eq(schema.user.email, MAIL));
+    return (await db.select().from(schema.session).where(eq(schema.session.userId, u.id))).length;
+  };
+  const resetGoogle = () => {
+    googleEmail = EMAIL;
+    googleVerified = true;
+    googleSub = "g-123";
+  };
+  const asGuesser = () => {
+    googleEmail = MAIL;
+    googleSub = SUB;
+  };
+  const challenge = async () => {
+    const jar = new Jar();
+    const res = await googleSignIn(jar);
+    expect(res.headers.get("location")).toContain("/two-factor");
+    return jar;
+  };
+  // A different address, a different spoofed header and a decoy cookie on every request: none of it should matter.
+  const guess = async (jar: Jar, code: string, i: number) => {
+    const res = await auth.handler(
+      new Request(`${BASE}/api/auth/two-factor/verify-totp`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: BASE,
+          cookie: `${jar.header}; x.two_factor=decoy-${i}`,
+          "x-forwarded-for": `203.0.113.${(i % 200) + 1}`,
+          "x-real-ip": `198.51.100.${(i % 200) + 1}`,
+        },
+        body: JSON.stringify({ code }),
+      }),
+    );
+    return { status: res.status, body: (await res.json().catch(() => ({}))) as { code?: string } };
+  };
+
+  it("enrols an account", async () => {
+    asGuesser();
+    const jar = new Jar();
+    expect((await googleSignIn(jar)).headers.get("location")).toContain("/dashboard");
+    const enable = (await (await call("/two-factor/enable", jar, { body: {} })).json()) as { totpURI: string };
+    uri = enable.totpURI;
+    expect((await call("/two-factor/verify-totp", jar, { body: { code: totp(uri) } })).status).toBe(200);
+    await call("/sign-out", jar, { body: {} });
+  });
+
+  it("stops a single challenge after a handful of wrong codes, even for the right code afterwards", async () => {
+    asGuesser();
+    const jar = await challenge();
+    const failures: number[] = [];
+    for (let i = 0; i < 5; i++) failures.push((await guess(jar, "000000", i)).status);
+    expect(failures.every((s) => s === 401)).toBe(true);
+    const after = await guess(jar, totp(uri), 99);
+    expect(after.status).not.toBe(200); // the challenge is spent: the guesser must pass the first factor again
+    expect(await sessionsOfGuesser()).toBe(0);
+    resetGoogle();
+  });
+
+  it("locks the account across challenges after enough failures, so a fresh challenge does not help", async () => {
+    asGuesser();
+    let locked: { status: number; body: { code?: string } } | null = null;
+    for (let round = 0; round < 6 && !locked; round++) {
+      const jar = await challenge();
+      for (let i = 0; i < 5; i++) {
+        const r = await guess(jar, "000000", round * 10 + i);
+        if (r.body.code === "ACCOUNT_TEMPORARILY_LOCKED" || r.status === 429) {
+          locked = r;
+          break;
+        }
+      }
+    }
+    expect(locked?.body.code).toBe("ACCOUNT_TEMPORARILY_LOCKED");
+    // and now even the correct code is refused, on a brand new challenge
+    const fresh = await challenge();
+    const right = await guess(fresh, totp(uri), 500);
+    expect(right.status).toBe(429);
+    expect(right.body.code).toBe("ACCOUNT_TEMPORARILY_LOCKED");
+    expect(await sessionsOfGuesser()).toBe(0);
+    resetGoogle();
+  });
+});

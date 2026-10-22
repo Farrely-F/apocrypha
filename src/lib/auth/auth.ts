@@ -20,7 +20,15 @@ export const providersEnabled = {
 // Authenticator-app sign-in. Real accounts come from GitHub or Google and have
 // no password, hence `allowPasswordless`: the guard for changing it is a recent
 // sign-in (two-factor-gate.ts), not a password.
-const totp = twoFactor({ issuer: "Apocrypha", allowPasswordless: true });
+// Wrong codes are bounded without looking at the client's address or headers at all: per pending challenge
+// (the plugin counts them against the signed challenge cookie it issued) and, across challenges, per account.
+// The numbers are the plugin's defaults, written down so a change is a decision and a test (see
+// two-factor-gate.test.ts) covers them.
+const totp = twoFactor({
+  issuer: "Apocrypha",
+  allowPasswordless: true,
+  accountLockout: { enabled: true, maxFailedAttempts: 10, durationSeconds: 900 },
+});
 
 export const auth = betterAuth({
   appName: "Apocrypha",
