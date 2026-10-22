@@ -10,7 +10,7 @@ The crypto has **not** been independently reviewed. Do not store anything you ca
 
 Every page gets a policy from `src/proxy.ts`, built in `src/lib/security/csp.ts`.
 
-**Strict, per-request nonce.** The pages that take a passphrase, a key or a session (`/sign-in`, `/two-factor`, `/vault/*`, `/dashboard`, `/settings`, `/o/*`, `/join/*`, `/s/*`):
+**Strict, per-request nonce.** The pages that take a passphrase, a key or a session (`/sign-in`, `/two-factor`, `/vault/*`, `/dashboard`, `/settings`, `/o/*`, `/join/*`, `/s/*`, `/admin/*`):
 
 - `script-src 'self' 'nonce-<random per request>' 'strict-dynamic' 'wasm-unsafe-eval'`. A script runs only if it carries this request's nonce or was loaded by one that does. There is no `'unsafe-inline'` and no `'unsafe-eval'`. (`'wasm-unsafe-eval'` is for Argon2id and does not allow `eval()`.)
 - `script-src-attr 'none'`: no inline event handlers.
@@ -35,6 +35,15 @@ It stops script that someone injects into a page (a cross-site-scripting bug, a 
 ### Other headers
 
 `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Cross-Origin-Opener-Policy: same-origin`, a `Permissions-Policy` that turns off camera, microphone, geolocation and payment, no `X-Powered-By`, and `Strict-Transport-Security` when `BETTER_AUTH_URL` is `https://`. (`next.config.ts`.)
+
+## The system administrator page
+
+`/admin` (usage, health, a masked people list, the access log) is for the deployment's operator, named by verified email in `SYSTEM_ADMIN_EMAILS`. It is read-only and sits outside the vault, so no vault key is open while it is. What it may see and how every look is recorded is in [`PRIVACY.md`](PRIVACY.md).
+
+- **It does not exist for anyone else.** The proxy decides before any response is streamed and answers like an unknown path: same status (404), same policy, same page. `verify:security` checks that `/admin` is indistinguishable from a made-up path for a visitor. An in-page `notFound()` is not enough: once a response is streaming its status is already 200.
+- **Every request is re-checked** against the env var, a verified address and a sign-in from the last `SYSTEM_ADMIN_SESSION_MINUTES` (default 60); the API (`/api/system/*`) checks again and returns a plain 404 to anyone else.
+- **It can be switched off** with `SYSTEM_ADMIN_ENABLED=false` without touching the list.
+- **Logging.** Server logs are structured JSON with an allowlist of fields and a redaction pass (`src/lib/log.ts`); the access log accepts only opaque ids (`src/lib/system/access-log.ts`). Both are tested with hostile input.
 
 ## Rate limits
 

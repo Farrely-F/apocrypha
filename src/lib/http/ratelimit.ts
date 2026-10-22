@@ -1,6 +1,7 @@
 import { lt, sql } from "drizzle-orm";
 import type { LibSQLDatabase } from "drizzle-orm/libsql";
 import * as schema from "../db/schema";
+import { log } from "../log";
 
 type Db = LibSQLDatabase<typeof schema>;
 
@@ -46,7 +47,10 @@ export const tooMany = (retryAfterSeconds: number) =>
 export async function limited(db: Db, key: string | null, limit: number, windowMs: number): Promise<Response | null> {
   if (!key) return null;
   const r = await hit(db, key, limit, windowMs);
-  return r.ok ? null : tooMany(r.retryAfterSeconds);
+  if (r.ok) return null;
+  // Which limit, never whose: the part of the key before the first colon is the rule's name.
+  log.warn("rate_limit.refused", { bucket: key.split(":")[0] });
+  return tooMany(r.retryAfterSeconds);
 }
 
 /** A signed-in client that writes in a loop (a script, a stuck retry) is slowed down; ordinary use is far below this. */

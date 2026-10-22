@@ -50,7 +50,7 @@ describe("static policy (prerendered pages with nothing to protect)", () => {
 
 describe("which pages get which", () => {
   it("puts every page that takes a passphrase, a key or a session on the strict policy", () => {
-    for (const p of ["/sign-in", "/two-factor", "/vault/new", "/vault/reset", "/dashboard", "/settings", "/o/x/p/y/e/z", "/o/x/settings", "/join/abc", "/s/abc"]) {
+    for (const p of ["/sign-in", "/two-factor", "/vault/new", "/vault/reset", "/dashboard", "/settings", "/o/x/p/y/e/z", "/o/x/settings", "/join/abc", "/s/abc", "/admin", "/admin/users"]) {
       expect(isStrictRoute(p), p).toBe(true);
     }
     for (const p of ["/", "/goodbye", "/specimen", "/robots.txt", "/no-such-page"]) expect(isStrictRoute(p), p).toBe(false);
@@ -111,9 +111,9 @@ describe("moving from a relaxed page into a strict one", () => {
 describe("the proxy that applies it", () => {
   const call = (path: string) => proxy(new NextRequest(`http://localhost:3000${path}`));
 
-  it("gives each request its own nonce, in the header and in what the page is rendered with", () => {
-    const a = call("/sign-in");
-    const b = call("/sign-in");
+  it("gives each request its own nonce, in the header and in what the page is rendered with", async () => {
+    const a = await call("/sign-in");
+    const b = await call("/sign-in");
     const nonce = (r: Response) => /'nonce-([^']+)'/.exec(r.headers.get("content-security-policy") ?? "")?.[1];
     expect(nonce(a)).toBeTruthy();
     expect(nonce(a)).not.toBe(nonce(b));
@@ -121,9 +121,9 @@ describe("the proxy that applies it", () => {
     expect(a.headers.get("x-middleware-request-content-security-policy")).toBe(a.headers.get("content-security-policy"));
   });
 
-  it("is strict on the app and loose only on the prerendered pages", () => {
-    expect(call("/dashboard").headers.get("content-security-policy")).toContain("'strict-dynamic'");
-    expect(call("/").headers.get("content-security-policy")).toContain("script-src 'self' 'unsafe-inline'");
+  it("is strict on the app and loose only on the prerendered pages", async () => {
+    expect((await call("/dashboard")).headers.get("content-security-policy")).toContain("'strict-dynamic'");
+    expect((await call("/")).headers.get("content-security-policy")).toContain("script-src 'self' 'unsafe-inline'");
   });
 
   it("makes nonces that are long and different every time", () => {
@@ -131,6 +131,18 @@ describe("the proxy that applies it", () => {
     expect(seen.size).toBe(200);
     expect([...seen][0].length).toBeGreaterThanOrEqual(22);
     expect(cspFor("/sign-in", "X")).toContain("'nonce-X'");
+  });
+
+  it("answers /admin as an unknown path while the feature is off, before any page runs", async () => {
+    delete process.env.SYSTEM_ADMIN_EMAILS;
+    const hidden = await call("/admin/users");
+    const unknown = await call("/no-such-page");
+    expect(hidden.headers.get("x-middleware-rewrite")).toContain("/__no_such_page__");
+    expect(hidden.headers.get("x-middleware-rewrite")).not.toContain("/admin");
+    // the same policy an unknown path gets: the relaxed one, with no nonce to give a difference away
+    expect(hidden.headers.get("content-security-policy")).toBe(unknown.headers.get("content-security-policy"));
+    expect(hidden.headers.get("content-security-policy")).not.toContain("nonce-");
+    expect(unknown.headers.get("x-middleware-rewrite")).toBeNull();
   });
 });
 

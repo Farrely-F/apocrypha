@@ -63,6 +63,20 @@ for (const path of STRICT) {
   }
 }
 
+console.log("\nthe administrator page does not exist for a visitor");
+{
+  const probe = async (path) => {
+    const r = await fetch(base + path, { redirect: "manual" });
+    return { status: r.status, csp: r.headers.get("content-security-policy")?.replace(/'nonce-[^']+'/g, "'nonce-X'") ?? "", location: r.headers.get("location") };
+  };
+  const unknown = await probe(`/no-such-page-${Date.now()}`);
+  for (const path of ["/admin", "/admin/users", "/admin/health", "/admin/access", "/api/system/chain-check"]) {
+    const got = await probe(path);
+    const api = path.startsWith("/api");
+    check(got.status === 404 && (api || (got.csp === unknown.csp && !got.location)), `${path} is a 404 like any unknown path${api ? "" : ", with the same policy"}`);
+  }
+}
+
 console.log("\nthe nonce is new on every request");
 {
   const nonces = new Set();

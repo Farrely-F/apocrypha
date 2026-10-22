@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, lt, or, sql, type SQL } from "drizzle-orm";
 import type { LibSQLDatabase } from "drizzle-orm/libsql";
 import * as schema from "../db/schema";
+import { errorFields, log } from "../log";
 import type { OrgRole } from "../db/schema";
 import { entryHash, GENESIS, verifyChain, type ChainCheck, type ChainEntry } from "./chain";
 
@@ -61,7 +62,7 @@ export async function audit(db: Db, input: AuditInput): Promise<void> {
   try {
     await recordAudit(db, input);
   } catch (e) {
-    console.error("audit log write failed:", input.type, (e as Error).message.slice(0, 120));
+    log.error("audit.write_failed", errorFields(e));
   }
 }
 

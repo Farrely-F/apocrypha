@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronsUpDown, LogOut, Settings } from "lucide-react";
+import { Activity, ChevronsUpDown, LogOut, Settings } from "lucide-react";
 import { UserAvatar } from "@/components/brand/user-avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,7 +16,7 @@ import {
 import { SigningOut, useSignOut } from "./sign-out-button";
 
 /** Who you are signed in as, with the way to your settings and out. */
-export function AccountMenu({ email }: { email: string }) {
+export function AccountMenu({ email, systemAdmin = false }: { email: string; systemAdmin?: boolean }) {
   const [signOut, signingOut] = useSignOut();
   return (
     <>
@@ -39,6 +39,11 @@ export function AccountMenu({ email }: { email: string }) {
           <DropdownMenuItem render={<Link href="/settings" />}>
             <Settings /> Settings
           </DropdownMenuItem>
+          {systemAdmin && (
+            <DropdownMenuItem render={<Link href="/admin" />}>
+              <Activity /> System
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onClick={() => void signOut()}>
             <LogOut /> Sign out
           </DropdownMenuItem>

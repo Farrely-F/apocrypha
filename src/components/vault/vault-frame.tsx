@@ -34,7 +34,7 @@ export function StatusInfo({ org, env, keyVersion }: Info) {
  * Locked content is unmounted, not hidden, so a lock also drops whatever the
  * screens held in memory.
  */
-function Frame({ userId, email, tree, children }: { userId: string; email: string; tree: TreeOrg[]; children: React.ReactNode }) {
+function Frame({ userId, email, systemAdmin, tree, children }: { userId: string; email: string; systemAdmin: boolean; tree: TreeOrg[]; children: React.ReactNode }) {
   const { status, trusted, lock } = useVault();
   const unlocked = status === "unlocked";
   const [info, setInfo] = useState<Info>({});
@@ -53,7 +53,7 @@ function Frame({ userId, email, tree, children }: { userId: string; email: strin
         actions={
           <>
             <CommandPalette tree={tree} />
-            <AccountMenu email={email} />
+            <AccountMenu email={email} systemAdmin={systemAdmin} />
           </>
         }
       />
@@ -98,19 +98,22 @@ function Frame({ userId, email, tree, children }: { userId: string; email: strin
 export function VaultFrame({
   userId,
   email,
+  systemAdmin = false,
   publicKey,
   tree,
   children,
 }: {
   userId: string;
   email: string;
+  /** Show the System link: the person is the deployment's administrator. Says nothing about their session. */
+  systemAdmin?: boolean;
   publicKey: string;
   tree: TreeOrg[];
   children: React.ReactNode;
 }) {
   return (
     <VaultProvider publicKey={publicKey}>
-      <Frame userId={userId} email={email} tree={tree}>{children}</Frame>
+      <Frame userId={userId} email={email} systemAdmin={systemAdmin} tree={tree}>{children}</Frame>
     </VaultProvider>
   );
 }

@@ -13,7 +13,7 @@
  */
 
 /** Top-level path segments rendered per request, where credentials, keys or unlocked data exist. */
-export const STRICT_PREFIXES = ["sign-in", "two-factor", "vault", "dashboard", "settings", "o", "join", "s"] as const;
+export const STRICT_PREFIXES = ["sign-in", "two-factor", "vault", "dashboard", "settings", "o", "join", "s", "admin"] as const;
 
 /** Top-level routes that are prerendered, with no credentials or keys on them. */
 export const STATIC_ROUTES = ["", "goodbye", "specimen"] as const;

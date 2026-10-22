@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { AppLoading } from "@/components/shell";
 import { VaultFrame } from "@/components/vault";
 import { requireSession } from "@/lib/auth/session";
+import { isListedAdmin } from "@/lib/system/admin";
 import { db } from "@/lib/db/client";
 import { getVaultRecord } from "@/lib/vault/store";
 import { listWorkspaceTree } from "@/lib/workspace/manage";
@@ -21,7 +22,7 @@ async function SessionGate({ children }: { children: React.ReactNode }) {
   // reaches the server, so this boundary cannot enforce it.
   const tree = await listWorkspaceTree(db, user.id);
   return (
-    <VaultFrame userId={user.id} email={user.email} publicKey={vault.publicKey} tree={tree}>
+    <VaultFrame userId={user.id} email={user.email} systemAdmin={isListedAdmin(user.email)} publicKey={vault.publicKey} tree={tree}>
       {children}
     </VaultFrame>
   );

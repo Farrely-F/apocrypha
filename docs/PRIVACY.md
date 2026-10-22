@@ -17,6 +17,7 @@ For people who **run** an Apocrypha server. This is an engineering description o
 | Invites addressed to your email | `invite.email` | Email-bound invites | Unused ones deleted; the address is blanked on used ones |
 | Sign-in tokens (magic links, trusted browser, pending two-factor, OAuth link requests) | `verification` | Sign-in flows | Yes |
 | Rate-limit counters keyed by your id | `rate_limit` | Abuse protection | Yes |
+| If you are the system administrator: an opaque id in the access log | `system_access_log` | Accountability for looking at other people's metadata | Kept for the retention window; it is an id, not an identity |
 | Every organisation you are the **only member** of, with its projects, environments, secrets and versions, invites, share links and audit log | many | It is yours alone | Yes (deleted with you) |
 | Secrets you wrote in an organisation that continues | `secret`, `secret_version` | They belong to the organisation | **Kept**, with your id as an opaque author reference |
 | Audit events where you acted or were the target, in organisations that continue | `audit_event` | Security record | **Kept**, with your id as an opaque reference |
@@ -24,6 +25,19 @@ For people who **run** an Apocrypha server. This is an engineering description o
 The dashboard's charts and counts are computed on request from rows the server already holds (counts, dates, the audit log a person may read); nothing is collected for them, nothing is stored, and nothing is sent to anyone. They follow the same visibility rules as the rest of the app: a person is counted only into environments whose key they hold, and sees the audit entries they are allowed to see. The secrets themselves are never opened for this.
 
 The app itself sets no analytics or advertising cookies and loads no third-party scripts. Cookies are the session, the two-factor challenge and the "don't ask for a code on this browser" marker, all first-party. Fonts are served by Next from the same origin.
+
+## The system administrator
+
+The operator of a deployment can name themselves in `SYSTEM_ADMIN_EMAILS` and open `/admin`, outside the vault, to see how the service is used and whether it is healthy. It is read-only and built to be the least that does that job:
+
+- **Who.** A verified email in the environment variable, checked on every request (nothing is stored that could go stale or be edited), with a sign-in from the last hour. If no one is listed, or `SYSTEM_ADMIN_ENABLED` is off, `/admin` answers exactly as an unknown path does, status included, decided in the proxy before anything is sent. Two-step sign-in is encouraged with a plain warning, not required.
+- **What it shows.** Counts and dates for the whole service (people, organisations, projects, environments, live secrets, sign-ups per day, active people, audit events per day by kind, share links and invites in flight, table sizes), live health (database answering, migrations in step, size, build), and a **people list** with a masked address (`a•••••@gmail.com`), joined date, last active (to the day), two-step on or off, sign-in methods, organisation count, secrets created and whether a vault exists.
+- **What it never shows.** Names, IP addresses, user agents, organisation, project or environment names, member lists, or the contents of any audit log. Secrets and keys are ciphertext and are not opened.
+- **Full addresses.** Only by clicking Show on a row, or by looking up a full address you already have (an exact match; no prefix or substring search, so it cannot be used to browse). Both are recorded.
+- **The access log.** Every page the administrator opens, every address shown and every lookup is written to `system_access_log` (time, the administrator's opaque id, a fixed action name, the opaque id of the account involved; never an address) and removed after `SYSTEM_ACCESS_LOG_DAYS` (default 180). The writer refuses anything that is not an opaque id. If the log cannot be written, an address is not shown. The administrator can read it on the page.
+- **Server logs.** The app writes one JSON line per event with a fixed set of fields. User ids, emails, IPs, bodies and URLs with ids are not in them; text is scrubbed of anything shaped like an email, token, cookie or sealed blob. The only identifier allowed is the administrator's own opaque id on `admin.*` events. Uncaught errors are logged by route template and error class, never by message.
+- **Saved numbers.** The system-wide counts are reused for five minutes from one row in `system_snapshot` (counts and dates only, no person in it), so they cost the same on a serverless host as on one server. Refresh deletes it.
+- **Your basis.** This is the operator looking at their own service to run, secure and size it, which is likely to rest on legitimate interest under the EU's rules and to fall within the stated purpose under Indonesia's PDP law. That is for you to state in your own privacy notice, and for a lawyer to confirm.
 
 ## Rights and where they live in the app
 

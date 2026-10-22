@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth/auth";
 import { audit } from "@/lib/audit/store";
 import { db } from "@/lib/db/client";
+import { errorFields, log } from "@/lib/log";
 import { readJsonLimited } from "@/lib/http/body";
 import { sameOrigin } from "@/lib/http/origin";
 import { limitWrites } from "@/lib/http/ratelimit";
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
     // The transaction rolled back: nothing was created. Log only the error code:
     // drizzle messages embed the query parameters (our blobs).
     const cause = error instanceof Error ? (error.cause as { code?: string } | undefined) : undefined;
-    console.error("create vault failed:", cause?.code ?? "unknown error");
+    log.error("vault.create_failed", errorFields(cause));
     return json({ error: "The server could not save your vault. Try again." }, 500);
   }
   if (result.status === "exists") {

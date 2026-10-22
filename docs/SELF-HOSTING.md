@@ -40,6 +40,11 @@ Everything is an environment variable.
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | for GitHub sign-in | OAuth app credentials. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | for Google sign-in | OAuth web client credentials. |
 | `DATABASE_URL` | no | Defaults to `file:/data/apocrypha.db` in the container. A `libsql://` Turso URL also works (then set `DATABASE_AUTH_TOKEN`). |
+| `SYSTEM_ADMIN_EMAILS` | no | Comma-separated verified emails of the people who may open `/admin` (usage, health, a masked people list). Unset or empty: the page does not exist. See [`PRIVACY.md`](PRIVACY.md). |
+| `SYSTEM_ADMIN_ENABLED` | no | `false`, `0`, `off` or `no` switches the admin page off even with emails set. |
+| `SYSTEM_ADMIN_SESSION_MINUTES` | no | How recent an administrator's sign-in must be. Default 60. |
+| `SYSTEM_ACCESS_LOG_DAYS` | no | How long the admin access log is kept. Default `AUDIT_RETENTION_DAYS`, else 180. |
+| `SYSTEM_LOGS_URL` | no | An https link to your host's log viewer, shown on the admin Health page. |
 | `AUDIT_RETENTION_DAYS` | no | How long audit events are kept. Default 180. |
 | `TRUSTED_PROXY_HOPS` | no | How many reverse proxies sit in front of the container. Default 1. Used to find the client address for rate limits: set `0` if you are not behind a proxy that sets `X-Forwarded-For`. |
 

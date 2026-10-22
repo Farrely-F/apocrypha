@@ -427,3 +427,26 @@ export const environmentWrite = sqliteTable(
   },
   (table) => [primaryKey({ name: "environment_write_pk", columns: [table.envId, table.userId] })],
 );
+
+// Every look the system administrator takes at other people's metadata (see lib/system/access-log.ts). Rows hold
+// opaque ids and a fixed action name, never an email address.
+export const systemAccessLog = sqliteTable(
+  "system_access_log",
+  {
+    id: text("id").primaryKey(),
+    at: integer("at").notNull(),
+    actorId: text("actor_id").notNull(),
+    action: text("action").notNull(),
+    subjectId: text("subject_id"),
+  },
+  (table) => [index("system_access_log_at_idx").on(table.at)],
+);
+
+// The system administrator's aggregate numbers, computed at most every few minutes (lib/system/cached.ts). In the
+// database, not in memory, so it works the same on a serverless host where each request may be a different
+// instance. It holds counts and dates only.
+export const systemSnapshot = sqliteTable("system_snapshot", {
+  key: text("key").primaryKey(),
+  computedAt: integer("computed_at").notNull(),
+  payload: text("payload").notNull(),
+});
