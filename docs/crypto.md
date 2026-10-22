@@ -1,6 +1,6 @@
 # Apocrypha crypto protocol (v1)
 
-> **UNAUDITED.** This is a from-scratch composition of standard primitives, written by the project authors. No independent review has happened. Do not rely on it to protect anything you cannot afford to lose until one has.
+> **NOT INDEPENDENTLY AUDITED.** This is a from-scratch composition of standard primitives, written by the project authors. It has had a self-review by an AI assistant ([`crypto-review.md`](crypto-review.md)), which is not independent and not an audit. Do not rely on it to protect anything you cannot afford to lose until a real review has happened.
 
 Implementation: `src/lib/crypto/` (framework-free, no React/Next imports; runs in browsers and Node's `webcrypto`). Design context: `docs/DESIGN.md` sections 3, 5, 11, 12.
 
@@ -166,10 +166,14 @@ The P-256 wrap is cross-checked against the `node:crypto` reference with random 
 
 ## 9. Not covered / known limits
 
-- **Unaudited**, and not verified in real browsers (tests run on Node's `webcrypto`; X25519 availability varies by browser, hence the P-256 fallback).
+- **Not independently audited** (see [`crypto-review.md`](crypto-review.md) for what was reviewed, by whom, and what was found), and not verified in real browsers (tests run on Node's `webcrypto`; X25519 availability varies by browser, hence the P-256 fallback).
 - Argon2id is only as correct as `hash-wasm`. One reference vector (single lane, no AD) is checked; multi-lane Argon2id and the RFC 9106 AD/secret path are not.
 - JavaScript cannot guarantee zeroisation; buffers are wiped best-effort.
 - The server delivers the code that runs this module (DESIGN.md section 2).
 - No forward secrecy for grants beyond the ephemeral sender key: compromise of a recipient's long-term private key exposes every grant ever wrapped to it.
 - Weak passphrases are weak regardless of Argon2id; the app should enforce a minimum.
 - Version/rollback checks, write authorisation, and the audit chain live outside this module.
+- **Grants are not authenticated.** Anyone with your public key can wrap a key to you; context binding stops replay, not forgery. An attacker who can *write* the database could supply a key they know for new writes. Signed grants are future work.
+- **Public keys are trusted on first use**, then pinned per browser.
+- **Lengths leak.** Ciphertext length is plaintext length plus 16; there is no padding.
+- The server controls the `deleted` flag and version ordering; neither is authenticated.

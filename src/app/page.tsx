@@ -83,8 +83,9 @@ const design = [
 
 const limits = [
   {
-    term: "Unaudited.",
-    text: "The crypto has tests and published vectors but no independent review yet. Don't store anything you can't rotate.",
+    term: "Not independently audited.",
+    text: "The crypto is checked against published test vectors and has had a review by an AI assistant, which is not an outside audit. That review found limits, such as keys the server hands out that nothing signs yet. Don't store anything you can't rotate.",
+    link: { label: "Read what was reviewed and found", href: `${REPO}/blob/main/docs/crypto-review.md` },
   },
   {
     term: "We serve the code that decrypts.",

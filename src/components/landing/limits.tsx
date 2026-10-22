@@ -5,7 +5,7 @@ import { motion, useInView } from "motion/react";
 import { Pane } from "@/components/shell";
 import { useReducedMotion } from "./use-reduced-motion";
 
-export type Limit = { term: string; text: string };
+export type Limit = { term: string; text: string; link?: { label: string; href: string } };
 
 /** Ledger rows that draw their rule in as they arrive. Content is readable without it. */
 export function Limits({ limits }: { limits: readonly Limit[] }) {
@@ -67,6 +67,14 @@ function Row({ limit, first }: { limit: Limit; first: boolean }) {
         className="max-w-[58ch] text-bone-dim"
       >
         {limit.text}
+        {limit.link && (
+          <>
+            {" "}
+            <a href={limit.link.href} className="whitespace-nowrap text-signal underline decoration-signal-dim underline-offset-4 hover:decoration-signal">
+              {limit.link.label}
+            </a>
+          </>
+        )}
       </motion.p>
     </li>
   );
