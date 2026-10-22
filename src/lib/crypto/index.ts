@@ -13,9 +13,11 @@ export {
   exportPrivateKey,
   generateKeyPair,
   importKeyPair,
+  isSoftKey,
   supportsX25519,
   type KeyAlg,
   type KeyPair,
+  type SoftKey,
 } from "./keys";
 
 // Environment keys

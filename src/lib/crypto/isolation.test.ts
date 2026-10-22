@@ -9,7 +9,7 @@ it("imports nothing from React, Next or the rest of the app", () => {
     const src = readFileSync(join(__dirname, f), "utf8");
     const specifiers = [...src.matchAll(/(?:from|import)\s*\(?\s*["']([^"']+)["']/g)].map((m) => m[1]);
     for (const s of specifiers) {
-      expect(s, `${f} imports ${s}`).toMatch(/^(\.\/|hash-wasm$)/);
+      expect(s, `${f} imports ${s}`).toMatch(/^(\.\/|hash-wasm$|@noble\/curves\/)/);
     }
   }
 });

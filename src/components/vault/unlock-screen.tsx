@@ -104,7 +104,7 @@ export function UnlockScreen({ email }: { email: string }) {
     await new Promise((r) => setTimeout(r, 40));
     let keyPair;
     try {
-      keyPair = await unlockVault(load.me.passphraseBlob, values.passphrase, load.me.publicKey);
+      keyPair = await unlockVault(load.me.passphraseBlob, values.passphrase);
       // The unlocked key must be the one the server holds the public half of.
       if (keyPair.publicKey !== load.me.publicKey) throw new CryptoError("decryption-failed", "mismatch");
     } catch (err) {

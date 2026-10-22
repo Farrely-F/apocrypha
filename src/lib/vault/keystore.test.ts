@@ -74,10 +74,11 @@ describe("session persistence", () => {
     expect(got).not.toBeNull();
     expect(got!.keyPair.publicKey).toBe(kp.publicKey);
     expect(got!.keyPair.alg).toBe(kp.alg);
-    expect(got!.keyPair.privateKey.extractable).toBe(false);
-    expect(got!.keyPair.privateKey.type).toBe("private");
+    const stored = got!.keyPair.privateKey as CryptoKey;
+    expect(stored.extractable).toBe(false);
+    expect(stored.type).toBe("private");
     await expect(
-      globalThis.crypto.subtle.exportKey("pkcs8", got!.keyPair.privateKey),
+      globalThis.crypto.subtle.exportKey("pkcs8", stored),
     ).rejects.toThrow();
   });
 

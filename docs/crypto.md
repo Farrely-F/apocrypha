@@ -8,11 +8,13 @@ Implementation: `src/lib/crypto/` (framework-free, no React/Next imports; runs i
 
 | Purpose | Primitive | Where |
 |---|---|---|
-| Key agreement | X25519 (P-256 ECDH fallback when X25519 is unavailable) | WebCrypto |
+| Key agreement | X25519 (P-256 ECDH fallback when X25519 is unavailable) | WebCrypto; `@noble/curves` for browsers whose WebCrypto cannot import X25519 keys |
 | KDF | HKDF-SHA-256 (RFC 5869), empty salt, domain-separated `info` | WebCrypto |
 | AEAD | AES-256-GCM, 96-bit IV, 128-bit tag | WebCrypto |
 | Passphrase KDF | Argon2id | `hash-wasm` (WASM) |
 | Randomness | `crypto.getRandomValues` | WebCrypto |
+
+Some iOS WebKit builds generate X25519 keys but refuse to import them. There the key is held as a 32-byte scalar in script memory and the X25519 math runs in `@noble/curves`. The wire format is unchanged, so such a device opens the same vault. A script-readable key is not the non-extractable CryptoKey the keystore is for, so it is never written to IndexedDB: the vault stays unlocked for that tab only and locks on reload.
 
 No novel constructions. The wrap is HPKE-shaped (ephemeral ECDH, HKDF, AEAD) but is **not** RFC 9180 HPKE and is not interoperable with it.
 

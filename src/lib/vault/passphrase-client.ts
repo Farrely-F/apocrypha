@@ -29,7 +29,7 @@ async function fetchRecoveryBlob(): Promise<string> {
  * same key pair the server knows. The server cannot check that, and a bad blob would lock the user out.
  */
 async function saveVerified(me: Me, blob: string, passphrase: string): Promise<KeyPair> {
-  const keyPair = await unlockVault(blob, passphrase, me.publicKey);
+  const keyPair = await unlockVault(blob, passphrase);
   if (keyPair.publicKey !== me.publicKey) throw new Error("The new passphrase blob did not open to your key. Nothing was saved.");
   const res = await fetch("/api/vault/passphrase", {
     method: "PUT",
@@ -43,7 +43,7 @@ async function saveVerified(me: Me, blob: string, passphrase: string): Promise<K
 /** Forgot the passphrase: the recovery key sets a new one. Returns the unlocked key pair. */
 export async function recoverWithKey(me: Me, recoveryKey: string, newPassphrase: string): Promise<KeyPair> {
   const recoveryBlob = await fetchRecoveryBlob();
-  const proof = await unlockVaultWithRecoveryKey(recoveryBlob, recoveryKey, me.publicKey);
+  const proof = await unlockVaultWithRecoveryKey(recoveryBlob, recoveryKey);
   if (proof.publicKey !== me.publicKey) throw new Error("That recovery key does not belong to this vault.");
   const blob = await resetPassphraseWithRecoveryKey(recoveryBlob, recoveryKey, newPassphrase);
   return saveVerified(me, blob, newPassphrase);

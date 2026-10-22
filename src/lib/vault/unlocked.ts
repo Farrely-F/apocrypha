@@ -1,4 +1,4 @@
-import type { KeyPair } from "../crypto";
+import { isSoftKey, type KeyPair } from "../crypto";
 import { announce, clearSession, saveSession } from "./keystore";
 
 // The unlocked identity for this tab. The source of truth across reloads and
@@ -40,6 +40,9 @@ export async function unlockWith(
   opts: { trusted?: boolean } = {},
 ): Promise<void> {
   current = keyPair;
+  // An in-memory (soft) key is script-readable, unlike the non-extractable CryptoKey the
+  // keystore exists to hold, so it lives only in this tab and a reload locks the vault.
+  if (isSoftKey(keyPair.privateKey)) return;
   await saveSession(keyPair, { trusted: opts.trusted === true });
   announce("unlock");
 }

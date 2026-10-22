@@ -5,86 +5,69 @@ afterEach(() => {
   vi.resetModules();
 });
 
-describe("a key from a browser with X25519, opened in one without", () => {
-  it("is reported as unsupported, not as a bad passphrase or damaged key", async () => {
-    // Make a real x25519 vault first, with the real WebCrypto.
-    const real = await import("./index");
-    const created = await real.createVault("correct horse battery staple", { alg: "x25519" });
-    expect(created.keyPair.alg).toBe("x25519");
+const realCrypto = globalThis.crypto;
+const PASS = "correct horse battery staple";
+const ctx = { envId: "e", keyVersion: 1 };
 
-    // Then a runtime whose WebCrypto refuses X25519.
-    vi.resetModules();
-    const subtle = globalThis.crypto.subtle;
-    const noX25519 = new Proxy(subtle, {
-      get(target, prop) {
-        if (prop === "generateKey" || prop === "importKey") {
-          const real = target[prop] as (...a: unknown[]) => unknown;
-          const algAt = prop === "generateKey" ? 0 : 2;
-          return (...args: unknown[]) =>
-            (args[algAt] as { name?: string })?.name === "X25519"
-              ? Promise.reject(new DOMException("no", "NotSupportedError"))
-              : real.apply(target, args);
-        }
-        const v = Reflect.get(target, prop, target);
-        return typeof v === "function" ? v.bind(target) : v;
-      },
-    });
-    vi.stubGlobal("crypto", { subtle: noX25519, getRandomValues: (a: Uint8Array) => globalThis.crypto.getRandomValues(a) });
-
-    const fresh = await import("./index");
-    const err = await fresh.unlockVault(created.passphraseBlob, "correct horse battery staple").catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(fresh.CryptoError);
-    expect((err as { code: string }).code).toBe("unsupported");
-    expect((err as Error).message).toContain("import pkcs8: NotSupportedError");
+/** A WebCrypto that refuses whatever `refuse(method, firstArg)` says, as some iOS WebKit builds do. */
+async function runtime(refuse: (method: string, args: unknown[]) => boolean) {
+  vi.resetModules();
+  const subtle = realCrypto.subtle;
+  const picky = new Proxy(subtle, {
+    get(target, prop) {
+      const v = Reflect.get(target, prop, target) as unknown;
+      if (typeof v !== "function") return v;
+      return (...args: unknown[]) =>
+        refuse(String(prop), args)
+          ? Promise.reject(new DOMException("no", "NotSupportedError"))
+          : (v as (...a: unknown[]) => unknown).apply(target, args);
+    },
   });
-});
+  vi.stubGlobal("crypto", { subtle: picky, getRandomValues: (a: Uint8Array) => realCrypto.getRandomValues(a) });
+  return import("./index");
+}
 
-describe("a runtime that is picky about X25519 PKCS#8", () => {
-  async function pickyRuntime(refuse: (op: string, arg0: unknown) => boolean) {
-    vi.resetModules();
-    const subtle = globalThis.crypto.subtle;
-    const picky = new Proxy(subtle, {
-      get(target, prop) {
-        const v = Reflect.get(target, prop, target) as unknown;
-        if (typeof v !== "function") return v;
-        return (...args: unknown[]) =>
-          refuse(String(prop), args[0])
-            ? Promise.reject(new DOMException("no", "OperationError"))
-            : (v as (...a: unknown[]) => unknown).apply(target, args);
-      },
-    });
-    vi.stubGlobal("crypto", { subtle: picky, getRandomValues: (a: Uint8Array) => globalThis.crypto.getRandomValues(a) });
-    return import("./index");
-  }
+const name = (a: unknown) => (a as { name?: string })?.name;
+const refusesX25519Import = (method: string, args: unknown[]) =>
+  method === "importKey" && name(args[2]) === "X25519";
 
-  it("loads the key as a JWK, given the public key the server holds", async () => {
+describe("a browser whose WebCrypto cannot import X25519 keys", () => {
+  it("still opens an X25519 vault, with the same public key and a working unwrap", async () => {
     const real = await import("./index");
-    const created = await real.createVault("correct horse battery staple", { alg: "x25519" });
-    const fresh = await pickyRuntime((op, a0) => op === "importKey" && a0 === "pkcs8");
-    const pair = await fresh.unlockVault(created.passphraseBlob, "correct horse battery staple", created.keyPair.publicKey);
+    const created = await real.createVault(PASS, { alg: "x25519" });
+    const granted = await real.wrapEnvironmentKey(new Uint8Array(32).fill(7), created.keyPair.publicKey, ctx);
+
+    // generateKey works, but every import of an X25519 key is refused (the iOS 18.3 report).
+    const ios = await runtime(refusesX25519Import);
+    expect(await ios.supportsX25519()).toBe(false);
+    const pair = await ios.unlockVault(created.passphraseBlob, PASS);
+    expect(ios.isSoftKey(pair.privateKey)).toBe(true);
     expect(pair.publicKey).toBe(created.keyPair.publicKey);
-    // The loaded key is the same one: it opens what the original wrapped.
-    const ctx = { envId: "e", keyVersion: 1 };
-    const wrapped = await real.wrapEnvironmentKey(new Uint8Array(32).fill(7), created.keyPair.publicKey, ctx);
-    expect(Array.from(await fresh.unwrapEnvironmentKey(wrapped, pair, ctx))).toEqual(new Array(32).fill(7));
+    expect(Array.from(await ios.unwrapEnvironmentKey(granted, pair, ctx))).toEqual(new Array(32).fill(7));
   });
 
-  it("without the server's key a refused PKCS#8 import still says where", async () => {
+  it("can also grant to an X25519 member, and the result opens in a normal browser", async () => {
     const real = await import("./index");
-    const created = await real.createVault("correct horse battery staple", { alg: "x25519" });
-    const fresh = await pickyRuntime((op, a0) => op === "importKey" && a0 === "pkcs8");
-    const err = await fresh.unlockVault(created.passphraseBlob, "correct horse battery staple").catch((e: unknown) => e);
-    expect((err as { code: string }).code).toBe("unsupported");
-    expect((err as Error).message).toContain("import pkcs8: OperationError");
+    const member = await real.createVault(PASS, { alg: "x25519" });
+    const ios = await runtime(refusesX25519Import);
+    const wrapped = await ios.wrapEnvironmentKey(new Uint8Array(32).fill(3), member.keyPair.publicKey, ctx);
+    vi.unstubAllGlobals();
+    vi.resetModules();
+    const back = await import("./index");
+    const pair = await back.unlockVault(member.passphraseBlob, PASS);
+    expect(Array.from(await back.unwrapEnvironmentKey(wrapped, pair, ctx))).toEqual(new Array(32).fill(3));
   });
 
-  it("falls back to the server's public key when the browser cannot derive it", async () => {
-    const real = await import("./index");
-    const created = await real.createVault("correct horse battery staple", { alg: "x25519" });
-    // Deriving the public half needs deriveBits against the base point; refuse the first such call only.
-    let derived = 0;
-    const fresh = await pickyRuntime((op, a0) => op === "deriveBits" && (a0 as { name?: string })?.name === "X25519" && derived++ === 0);
-    const pair = await fresh.unlockVault(created.passphraseBlob, "correct horse battery staple", created.keyPair.publicKey);
-    expect(pair.publicKey).toBe(created.keyPair.publicKey);
+  it("round-trips the key through PKCS#8 so a new vault made there opens anywhere", async () => {
+    const ios = await runtime((method, args) => method === "generateKey" && name(args[0]) === "X25519");
+    expect(await ios.supportsX25519()).toBe(false);
+    const made = await ios.createVault(PASS, { alg: "x25519" });
+    expect(ios.isSoftKey(made.keyPair.privateKey)).toBe(true);
+    vi.unstubAllGlobals();
+    vi.resetModules();
+    const back = await import("./index");
+    const pair = await back.unlockVault(made.passphraseBlob, PASS);
+    expect(pair.publicKey).toBe(made.keyPair.publicKey);
+    expect(back.isSoftKey(pair.privateKey)).toBe(false);
   });
 });

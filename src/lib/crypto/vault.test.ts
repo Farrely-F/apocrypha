@@ -54,10 +54,11 @@ describe.each<KeyAlg>(["x25519", "p256"])("vault (%s)", (alg) => {
   it("returns non-extractable private keys that still unwrap environment keys", async () => {
     const vault = await createVault(pass, { alg, params: FAST });
     const unlocked = await unlockVault(vault.passphraseBlob, pass);
-    expect(unlocked.privateKey.extractable).toBe(false);
-    expect(vault.keyPair.privateKey.extractable).toBe(false);
+    const keys = [unlocked.privateKey, vault.keyPair.privateKey] as CryptoKey[];
+    expect(keys[0].extractable).toBe(false);
+    expect(keys[1].extractable).toBe(false);
     await expect(
-      globalThis.crypto.subtle.exportKey("pkcs8", unlocked.privateKey),
+      globalThis.crypto.subtle.exportKey("pkcs8", keys[0]),
     ).rejects.toBeDefined();
 
     const envKey = generateEnvironmentKey();
