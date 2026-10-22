@@ -6,9 +6,10 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
-import type { KeyPair } from "@/lib/crypto";
+import { isSoftKey, type KeyPair } from "@/lib/crypto";
 import {
   clearSession,
   IDLE_TIMEOUT_MS,
@@ -66,6 +67,13 @@ export function VaultProvider({
   children: React.ReactNode;
 }) {
   const [state, setState] = useState<VaultState>(LOADING);
+  // An in-memory (soft) key is never in the keystore, so the keystore cannot tell us it is
+  // alive: this tab keeps its own idle clock and ignores what the keystore says about it.
+  const soft = state.keyPair !== null && isSoftKey(state.keyPair.privateKey);
+  const softRef = useRef(soft);
+  useEffect(() => {
+    softRef.current = soft;
+  }, [soft]);
 
   const close = useCallback(() => {
     adoptKeyPair(null);
@@ -74,6 +82,7 @@ export function VaultProvider({
 
   /** Read the keystore (which also wipes anything expired) and follow it. */
   const sync = useCallback(async () => {
+    if (softRef.current) return;
     const s = await loadSession();
     if (s && s.keyPair.publicKey === publicKey) {
       adoptKeyPair(s.keyPair);
@@ -109,6 +118,26 @@ export function VaultProvider({
   // Idle lock, expiry and activity tracking. Only while unlocked.
   useEffect(() => {
     if (!unlocked) return;
+
+    if (soft) {
+      let lastActive = Date.now();
+      const bump = () => {
+        lastActive = Date.now();
+      };
+      const idle = setInterval(() => {
+        if (Date.now() - lastActive >= IDLE_TIMEOUT_MS) {
+          close();
+          void lockStore();
+        }
+      }, CHECK_EVERY_MS);
+      for (const e of ACTIVITY_EVENTS) window.addEventListener(e, bump, { passive: true });
+      window.addEventListener("scroll", bump, { passive: true, capture: true });
+      return () => {
+        clearInterval(idle);
+        for (const e of ACTIVITY_EVENTS) window.removeEventListener(e, bump);
+        window.removeEventListener("scroll", bump, { capture: true });
+      };
+    }
 
     const lockIfGone = (alive: boolean) => {
       if (!alive) {
@@ -151,7 +180,7 @@ export function VaultProvider({
       window.removeEventListener("scroll", onActivity, { capture: true });
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [unlocked, trusted, publicKey, close]);
+  }, [unlocked, soft, trusted, publicKey, close]);
 
   const unlock = useCallback<VaultContextValue["unlock"]>(async (keyPair, opts = {}) => {
     try {
