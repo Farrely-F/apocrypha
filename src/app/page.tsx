@@ -6,9 +6,10 @@ import { PageGround } from "@/components/landing/page-ground";
 import { LandingFooter } from "@/components/landing/landing-footer";
 import { Hero } from "@/components/landing/hero";
 import { ServerLedger } from "@/components/landing/server-ledger";
+import { HowItWorks } from "@/components/landing/how-it-works";
 import { DesignChapter } from "@/components/landing/design-chapter";
 import { Limits } from "@/components/landing/limits";
-import { Unlock } from "@/components/landing/unlock";
+import { Faq } from "@/components/landing/faq";
 import { SITE } from "@/lib/seo";
 
 const REPO = "https://github.com/Farrely-F/apocrypha";
@@ -99,6 +100,41 @@ const limits = [
   },
 ] as const;
 
+const faq = [
+  {
+    q: "What can the server see?",
+    a: "Ciphertext, and the structure around it: the names of your orgs, projects and environments, who belongs to each org and in what role, when each change happened and who made it, and how many secrets an environment holds. It never sees a secret's name or value, your passphrase, or your private key.",
+  },
+  {
+    q: "Why a passphrase when I already sign in with GitHub or Google?",
+    a: "Signing in proves to the server who you are. The passphrase is a separate secret that never leaves your browser: it unlocks the private key that opens your environments. That split is why a leaked session can't read your secrets.",
+  },
+  {
+    q: "What if I forget my passphrase?",
+    a: "Use the recovery key you were shown once when you made the vault. If you've lost both, an admin of your org can reset you to a fresh key and re-share the environments you belonged to. Anything stored only in your personal vault is gone for good, and nobody can recover it for you, including us.",
+  },
+  {
+    q: "How do I get my .env in and out?",
+    a: "Paste or upload a .env and your browser parses it, sealing each entry as its own version. Export as .env or JSON, or copy a single value, any time you're unlocked.",
+  },
+  {
+    q: "How does a teammate get access?",
+    a: "Send them an invite link. The key they need travels after the # in the link, which browsers never send to us, and the invite works once, for 48 hours. You choose which environments they can read or write, and you can only share ones you can read yourself.",
+  },
+  {
+    q: "What happens when I remove someone?",
+    a: "Their access to that environment's key is cut and new writes use a fresh key. They keep whatever they already saw, though, so rotate those secrets at their source. We list which ones the person could read.",
+  },
+  {
+    q: "Can I run it myself?",
+    a: "Yes. It's a Next.js app and a Postgres database with a Docker setup, and the same encryption applies: the server you run still only holds ciphertext. The self-hosting guide in the repo covers configuration, backups and upgrades.",
+  },
+  {
+    q: "Is it safe for production secrets yet?",
+    a: "Not yet. The crypto has tests and published vectors but no independent review. Until there is one, keep to secrets you can rotate.",
+  },
+] as const;
+
 const wrap = "mx-auto w-full max-w-[96rem] px-6 sm:px-10";
 
 export default function Landing() {
@@ -112,6 +148,21 @@ export default function Landing() {
         type="application/ld+json"
         // Static, authored JSON. Never interpolate user input here.
         dangerouslySetInnerHTML={{ __html: JSON.stringify(SITE.jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        // Static, authored JSON built from the same list the page renders.
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: faq.map((f) => ({
+              "@type": "Question",
+              name: f.q,
+              acceptedAnswer: { "@type": "Answer", text: f.a },
+            })),
+          }),
+        }}
       />
       <LandingHeader repo={REPO} />
 
@@ -134,6 +185,12 @@ export default function Landing() {
           <div className="mora-rule-diamond" role="separator" />
         </div>
 
+        <HowItWorks sample={ledger[0]} />
+
+        <div className={wrap}>
+          <div className="mora-rule-diamond" role="separator" />
+        </div>
+
         <DesignChapter steps={design} />
 
         <div className={wrap}>
@@ -142,7 +199,7 @@ export default function Landing() {
 
         <Limits limits={limits} />
 
-        <Unlock repo={REPO} />
+        <Faq questions={faq} repo={REPO} />
       </main>
 
       <LandingFooter repo={REPO} />

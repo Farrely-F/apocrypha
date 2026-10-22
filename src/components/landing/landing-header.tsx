@@ -16,8 +16,10 @@ import { useSignedIn } from "./use-signed-in";
 
 export const CHAPTERS = [
   { id: "holds", label: "What we hold" },
+  { id: "how", label: "How it works" },
   { id: "design", label: "The design" },
   { id: "limits", label: "Limits" },
+  { id: "faq", label: "FAQ" },
 ] as const;
 
 /**
