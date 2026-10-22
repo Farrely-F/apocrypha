@@ -15,3 +15,5 @@ export const REAUTH_MESSAGE = "For your safety, sign out and sign in again, then
 export const REAUTH_2FA_MESSAGE = "For your safety, sign out and sign in again, then retry. This needs a sign-in from the last 15 minutes.";
 
 export const REAUTH_ERASE_MESSAGE = "For your safety, sign out and sign in again, then retry. Erasing an account needs a sign-in from the last 15 minutes.";
+
+export const REAUTH_ORG_DELETE_MESSAGE = "For your safety, sign out and sign in again, then retry. Deleting an organisation needs a sign-in from the last 15 minutes.";

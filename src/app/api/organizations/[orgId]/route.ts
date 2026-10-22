@@ -1,6 +1,9 @@
+import { auth } from "@/lib/auth/auth";
+import { REAUTH_ORG_DELETE_MESSAGE, signedInRecently } from "@/lib/auth/fresh";
 import { db } from "@/lib/db/client";
 import { audit } from "@/lib/audit/store";
 import { readJsonLimited } from "@/lib/http/body";
+import { limited } from "@/lib/http/ratelimit";
 import { UUID } from "@/lib/vault/payload";
 import { deleteOrganization, renameOrganization } from "@/lib/workspace/manage";
 import { guard, json, manageResponse, readName } from "@/lib/workspace/http";
@@ -28,6 +31,11 @@ export async function PATCH(request: Request, { params }: Ctx) {
 export async function DELETE(request: Request, { params }: Ctx) {
   const who = await guard(request);
   if (who instanceof Response) return who;
+  const slow = await limited(db, `org-delete:${who.userId}`, 10, 3_600_000);
+  if (slow) return slow;
+  // Same rule as erasing an account: a stolen session cookie alone must not be able to wipe an organisation.
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session || !signedInRecently(session.session)) return json({ error: REAUTH_ORG_DELETE_MESSAGE, code: "RECENT_SIGN_IN_REQUIRED" }, 403);
   const read = await readJsonLimited(request, 1_000);
   if (!read.ok) return json({ error: read.error }, read.status);
   const name = (read.value as { name?: unknown } | null)?.name;

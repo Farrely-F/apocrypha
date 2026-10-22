@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ActionError } from "@/components/settings/reauth-alert";
 import { Pane } from "@/components/shell";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -25,7 +25,7 @@ export function DangerPane({ org, role, members }: { org: TreeOrg; role: OrgRole
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ code?: string; message: string } | null>(null);
   const environments = org.projects.reduce((n, p) => n + p.environments.length, 0);
 
   async function destroy() {
@@ -37,8 +37,8 @@ export function DangerPane({ org, role, members }: { org: TreeOrg; role: OrgRole
       body: JSON.stringify({ name: typed }),
     });
     if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      setError(body?.error ?? "Could not delete the organisation. Try again.");
+      const body = (await res.json().catch(() => null)) as { error?: string; code?: string } | null;
+      setError({ code: body?.code, message: body?.error ?? "Could not delete the organisation. Try again." });
       setBusy(false);
       return;
     }
@@ -83,11 +83,7 @@ export function DangerPane({ org, role, members }: { org: TreeOrg; role: OrgRole
             <FieldLabel htmlFor="confirm-org-name">Type {org.name} to confirm</FieldLabel>
             <Input id="confirm-org-name" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck={false} />
           </Field>
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+          {error && <ActionError code={error.code} message={error.message} />}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Keep it</AlertDialogCancel>
             <Button type="button" variant="destructive" disabled={busy || typed !== org.name} onClick={() => void destroy()}>

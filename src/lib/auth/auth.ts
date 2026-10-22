@@ -39,15 +39,15 @@ export const auth = betterAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
     },
   },
-  // The same address from GitHub and from Google is one person. Both only
-  // hand over an email they have verified, so linking on it is safe; a
-  // provider that did not verify the address would never be linked.
-  // `allowDifferentEmails` only affects the explicit Link button in Settings
-  // (someone with a GitHub address and a different Google address): it never
-  // merges accounts at sign-in, and linking needs a recent sign-in
-  // (two-factor-gate.ts), so a stolen session cannot attach a stranger's login.
+  // The same address from GitHub and from Google is one person, so signing in with a second provider
+  // links to the existing account, but only when that provider says it has verified the email. There is
+  // deliberately no `trustedProviders`: it would link on an unverified address too, which lets anyone who
+  // can register that address at a provider take over the account that owns it.
+  // `allowDifferentEmails` only affects the explicit Link button in Settings (someone with a GitHub
+  // address and a different Google address). It never applies at sign-in, and that flow needs a sign-in
+  // from the last 15 minutes (two-factor-gate.ts), so a stolen session cannot attach a stranger's login.
   account: {
-    accountLinking: { enabled: true, trustedProviders: ["github", "google"], allowDifferentEmails: true },
+    accountLinking: { enabled: true, allowDifferentEmails: true },
   },
   // A failed OAuth round trip lands back on our page with ?error=<code>.
   onAPIError: { errorURL: "/sign-in" },

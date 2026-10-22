@@ -35,8 +35,11 @@ afterAll(() => vi.unstubAllGlobals());
 // ---- helpers ---------------------------------------------------------------
 
 const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
+let googleEmail = EMAIL;
+let googleVerified = true;
+let googleSub = "g-123";
 const idToken = () =>
-  `${b64({ alg: "none" })}.${b64({ sub: "g-123", email: EMAIL, email_verified: true, name: "Person", iss: "https://accounts.google.com", aud: "google-id" })}.x`;
+  `${b64({ alg: "none" })}.${b64({ sub: googleSub, email: googleEmail, email_verified: googleVerified, name: "Person", iss: "https://accounts.google.com", aud: "google-id" })}.x`;
 
 function stubGoogle() {
   const real = globalThis.fetch;
@@ -274,5 +277,80 @@ describe("linking GitHub to a Google account with a different email", () => {
     expect(start.status).toBe(403);
     expect(done).toBeNull();
     expect((await accountsOf("victim@example.com")).map((a) => a.providerId)).toEqual(["credential"]);
+  });
+});
+
+describe("signing in with a second provider on an existing email", () => {
+  const OWNER = "owner@example.com";
+  const reset = () => {
+    googleEmail = EMAIL;
+    googleVerified = true;
+    googleSub = "g-123";
+  };
+  const googleAccounts = async () => (await db.select().from(schema.account)).filter((a) => a.providerId === "google" && a.accountId === googleSub);
+
+  it("does not link, and does not sign in, when the provider has not verified the address", async () => {
+    stubGoogle();
+    await call("/sign-up/email", new Jar(), { body: { email: OWNER, password: "test-password-123", name: "Owner" } });
+    // The account's own address is verified (made through GitHub, say): only the provider's word is in question.
+    await db.update(schema.user).set({ emailVerified: true }).where(eq(schema.user.email, OWNER));
+    googleEmail = OWNER;
+    googleVerified = false;
+    googleSub = "g-attacker";
+    const jar = new Jar();
+    const res = await googleSignIn(jar);
+    expect(res.headers.get("location")).toContain("error=");
+    expect(jar.has("session_token")).toBe(false);
+    expect(await googleAccounts()).toHaveLength(0);
+    reset();
+  });
+
+  it("links once the provider says the address is verified and the account's own address is too", async () => {
+    googleEmail = OWNER;
+    googleSub = "g-owner";
+    const before = (await db.select().from(schema.user)).length;
+    // A local account whose address was never verified is not linked to either, however the provider answers.
+    await db.update(schema.user).set({ emailVerified: false }).where(eq(schema.user.email, OWNER));
+    const refused = await googleSignIn(new Jar());
+    expect(refused.headers.get("location")).toContain("error=account_not_linked");
+    expect(await googleAccounts()).toHaveLength(0);
+    // An account made through GitHub or Google has a verified address.
+    await db.update(schema.user).set({ emailVerified: true }).where(eq(schema.user.email, OWNER));
+    const jar = new Jar();
+    const res = await googleSignIn(jar);
+    expect(res.headers.get("location")).toContain("/dashboard");
+    expect(jar.has("session_token")).toBe(true);
+    expect(await googleAccounts()).toHaveLength(1);
+    expect((await db.select().from(schema.user)).length).toBe(before);
+    reset();
+  });
+});
+
+describe("deleting an organisation over HTTP", () => {
+  it("needs a recent sign-in and the exact name, and then removes it", async () => {
+    const { createOrganization } = await import("@/lib/workspace/manage");
+    const { DELETE } = await import("@/app/api/organizations/[orgId]/route");
+    const jar = new Jar();
+    await call("/sign-up/email", jar, { body: { email: "boss@example.com", password: "test-password-123", name: "Boss" } });
+    const [u] = await db.select().from(schema.user).where(eq(schema.user.email, "boss@example.com"));
+    const org = await createOrganization(db, u.id, { name: "Gone Soon", projectName: "P", environment: { id: crypto.randomUUID(), name: "dev", wrappedKey: "w" } });
+    if (org.status !== "created") throw new Error("setup");
+    const del = (name: string) =>
+      DELETE(new Request(`${BASE}/api/organizations/${org.orgId}`, { method: "DELETE", headers: { "content-type": "application/json", origin: BASE, cookie: jar.header }, body: JSON.stringify({ name }) }), {
+        params: Promise.resolve({ orgId: org.orgId }),
+      });
+    const exists = async () => (await db.select().from(schema.organization).where(eq(schema.organization.id, org.orgId))).length;
+
+    await db.update(schema.session).set({ createdAt: new Date(Date.now() - 3_600_000) }).where(eq(schema.session.userId, u.id));
+    const stale = await del("Gone Soon");
+    expect(stale.status).toBe(403);
+    expect(((await stale.json()) as { code?: string }).code).toBe("RECENT_SIGN_IN_REQUIRED");
+    expect(await exists()).toBe(1);
+
+    await db.update(schema.session).set({ createdAt: new Date() }).where(eq(schema.session.userId, u.id));
+    expect((await del("wrong name")).status).toBe(400);
+    expect(await exists()).toBe(1);
+    expect((await del("Gone Soon")).status).toBe(200);
+    expect(await exists()).toBe(0);
   });
 });
