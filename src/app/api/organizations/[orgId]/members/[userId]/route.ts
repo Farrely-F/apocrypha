@@ -19,7 +19,7 @@ export async function PATCH(request: Request, { params }: Ctx) {
     await audit(db, { orgId, actorId: who.userId, type: "member.role_changed", targetUserId: userId, data: { role: String(o?.role) } });
     return json({ ok: true });
   }
-  if (r === "bad-role") return json({ error: "Role must be admin or member." }, 400);
+  if (r === "bad-role") return json({ error: "Role must be owner, admin or member." }, 400);
   return r === "forbidden" ? json({ error: "Only an owner can change roles." }, 403) : json({ error: "Not found." }, 404);
 }
 

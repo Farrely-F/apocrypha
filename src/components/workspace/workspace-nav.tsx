@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowUpLeft, Check, ChevronsUpDown, Pencil, Plus, Trash2, ScrollText, UserPlus, Users } from "lucide-react";
+import { ArrowUpLeft, Check, ChevronsUpDown, Pencil, Plus, Trash2, ScrollText, Settings, UserPlus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MembersDialog } from "@/components/workspace/members-dialog";
@@ -55,9 +55,9 @@ export function WorkspaceNav({ tree }: { tree: TreeOrg[] }) {
   if (!org) return null;
 
   return (
-    <div className="flex min-w-0 items-center gap-1 text-sm" aria-label="Location" role="navigation">
+    <div data-tour="workspace" className="flex min-w-0 items-center gap-1 text-sm" aria-label="Location" role="navigation">
       <DropdownMenu>
-        <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="hidden max-w-40 text-bone-faint sm:inline-flex" aria-label="Switch organisation" />}>
+        <DropdownMenuTrigger render={<Button variant="ghost" size="sm" data-tour="org" className="hidden max-w-40 text-bone-faint sm:inline-flex" aria-label="Switch organisation" />}>
           {trigger(org.name)}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="min-w-56">
@@ -83,6 +83,9 @@ export function WorkspaceNav({ tree }: { tree: TreeOrg[] }) {
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setNewOrg(true)}>
             <Plus /> New organisation
+          </DropdownMenuItem>
+          <DropdownMenuItem render={<Link href={`${orgPath(org.id)}/settings`} />}>
+            <Settings /> Organisation settings
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setMembers(true)}>
             <Users /> Members

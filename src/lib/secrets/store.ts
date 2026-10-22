@@ -4,6 +4,7 @@ import * as schema from "../db/schema";
 import type { OrgRole } from "../db/schema";
 import type { CreateSecretBody, NewVersionBody } from "./payload";
 import type { SecretRow } from "./seal";
+import { WRITERS } from "../workspace/roles";
 
 type Db = LibSQLDatabase<typeof schema>;
 
@@ -91,7 +92,6 @@ export type CreateSecretResult =
   | { status: "forbidden" | "stale-key" | "exists" };
 
 /** These roles may write in every environment they can open. Others need a per-environment write grant. */
-const WRITERS: readonly OrgRole[] = ["owner", "admin"];
 
 /**
  * Store a new secret as version 1. The secret row and its first version go in

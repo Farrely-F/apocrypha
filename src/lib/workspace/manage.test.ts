@@ -8,7 +8,7 @@ import { migrate } from "drizzle-orm/libsql/migrator";
 import { beforeAll, describe, expect, it } from "vitest";
 import * as schema from "../db/schema";
 import { createVaultRecord } from "../vault/store";
-import { createEnvironment, createOrganization, createProject, deleteEnvironment, deleteProject, listWorkspaceTree, renameEnvironment, renameProject } from "./manage";
+import { createEnvironment, createOrganization, createProject, deleteEnvironment, deleteOrganization, deleteProject, listWorkspaceTree, renameEnvironment, renameOrganization, renameProject } from "./manage";
 import type { WorkspaceIds } from "./shared";
 
 let db: ReturnType<typeof drizzle<typeof schema>>;
@@ -124,5 +124,34 @@ describe("organisations", () => {
     expect((await createOrganization(db, "bob", { name: "X", projectName: "Y", environment: e })).status).toBe("env-exists");
     // alice sees none of it
     expect((await listWorkspaceTree(db, "alice")).map((o) => o.name)).not.toContain("Acme");
+  });
+});
+
+describe("organisation settings", () => {
+  it("only an owner renames, and a member or stranger cannot even tell it exists", async () => {
+    expect(await renameOrganization(db, "dave", alice.orgId, "Hijacked")).toEqual({ status: "forbidden" });
+    expect(await renameOrganization(db, "bob", alice.orgId, "Hijacked")).toEqual({ status: "not-found" });
+    expect(await renameOrganization(db, "alice", alice.orgId, "Acme")).toEqual({ status: "ok" });
+    expect((await listWorkspaceTree(db, "alice"))[0].name).toBe("Acme");
+  });
+
+  it("deletes the organisation and all of it, only for an owner who says its name", async () => {
+    const made = await createOrganization(db, "alice", { name: "Doomed", projectName: "P", environment: env("dev") });
+    if (made.status !== "created") throw new Error("setup");
+    await db.insert(schema.member).values({ id: crypto.randomUUID(), organizationId: made.orgId, userId: "dave", role: "admin" });
+    const keep = (await listWorkspaceTree(db, "alice")).length;
+
+    expect(await deleteOrganization(db, "dave", made.orgId, "Doomed")).toEqual({ status: "forbidden" });
+    expect(await deleteOrganization(db, "bob", made.orgId, "Doomed")).toEqual({ status: "not-found" });
+    expect(await deleteOrganization(db, "alice", made.orgId, "doomed")).toEqual({ status: "name-mismatch" });
+    expect((await listWorkspaceTree(db, "alice")).length).toBe(keep);
+
+    expect(await deleteOrganization(db, "alice", made.orgId, "Doomed")).toEqual({ status: "ok" });
+    expect((await listWorkspaceTree(db, "alice")).map((o) => o.name)).not.toContain("Doomed");
+    for (const t of [schema.project, schema.environment, schema.environmentKeyGrant, schema.member]) {
+      const rows = await db.select().from(t);
+      expect(JSON.stringify(rows)).not.toContain(made.orgId);
+      expect(JSON.stringify(rows)).not.toContain(made.envId);
+    }
   });
 });

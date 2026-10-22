@@ -86,7 +86,7 @@ export function ResetFlow({ email }: { email: string }) {
               <Button variant="destructive" disabled={typed.trim() !== "RESET"} onClick={() => setGo(true)}>
                 Continue
               </Button>
-              <Button variant="ghost" render={<Link href="/dashboard" />}>
+              <Button nativeButton={false} variant="ghost" render={<Link href="/dashboard" />}>
                 Cancel
               </Button>
             </div>

@@ -20,7 +20,7 @@ async function SessionGate({ children }: { children: React.ReactNode }) {
   // reaches the server, so this boundary cannot enforce it.
   const tree = await listWorkspaceTree(db, user.id);
   return (
-    <VaultFrame email={user.email} publicKey={vault.publicKey} tree={tree}>
+    <VaultFrame userId={user.id} email={user.email} publicKey={vault.publicKey} tree={tree}>
       {children}
     </VaultFrame>
   );

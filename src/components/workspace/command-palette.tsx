@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Boxes, CornerDownLeft, FolderTree, KeyRound, Lock, Search, Terminal } from "lucide-react";
+import { Boxes, CornerDownLeft, FolderTree, KeyRound, Lock, Route, Search, Settings, Terminal, Users } from "lucide-react";
 import { Command, CommandDialog, CommandEmpty, CommandFooter, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
 import { ChangePassphraseDialog } from "@/components/vault/change-passphrase-dialog";
+import { useTour } from "@/components/tour";
 import { useVault } from "@/components/vault/vault-provider";
 import { environmentPath, orgPath, projectPath } from "@/lib/workspace/shared";
 import type { TreeOrg } from "@/lib/workspace/manage";
@@ -16,6 +17,7 @@ export function CommandPalette({ tree }: { tree: TreeOrg[] }) {
   const [passphrase, setPassphrase] = useState(false);
   const router = useRouter();
   const { lock } = useVault();
+  const tour = useTour();
   const pathname = usePathname();
   // The org you are in, from the URL; otherwise the first one you belong to.
   const currentId = /^\/o\/([^/]+)/.exec(pathname)?.[1];
@@ -24,6 +26,7 @@ export function CommandPalette({ tree }: { tree: TreeOrg[] }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        if (document.documentElement.hasAttribute("data-tour-active")) return;
         e.preventDefault();
         setOpen((o) => !o);
       }
@@ -42,6 +45,7 @@ export function CommandPalette({ tree }: { tree: TreeOrg[] }) {
       <Button
         variant="ghost"
         size="sm"
+        data-tour="palette"
         className="absolute top-1/2 left-1/2 z-10 hidden h-8 w-64 -translate-x-1/2 -translate-y-1/2 justify-start gap-2 border-0 bg-transparent px-2.5 font-normal text-bone-faint hover:bg-pane/40 hover:text-bone xl:inline-flex"
         onClick={() => setOpen(true)}
         aria-label="Open command palette"
@@ -53,6 +57,7 @@ export function CommandPalette({ tree }: { tree: TreeOrg[] }) {
       <Button
         variant="ghost"
         size="icon-sm"
+        data-tour="palette"
         className="shrink-0 text-bone-faint xl:hidden"
         onClick={() => setOpen(true)}
         aria-label="Open command palette"
@@ -103,6 +108,14 @@ export function CommandPalette({ tree }: { tree: TreeOrg[] }) {
             </CommandGroup>
             <CommandSeparator />
             <CommandGroup heading="Vault">
+              <CommandItem value="settings account profile two-step security sessions" onSelect={() => go("/settings")}>
+                <Settings /> Account settings
+              </CommandItem>
+              {current && (
+                <CommandItem value={`organisation settings members roles permissions ${current.name}`} onSelect={() => go(`${orgPath(current.id)}/settings`)}>
+                  <Users /> Organisation settings: {current.name}
+                </CommandItem>
+              )}
               <CommandItem
                 value="change passphrase"
                 onSelect={() => {
@@ -111,6 +124,16 @@ export function CommandPalette({ tree }: { tree: TreeOrg[] }) {
                 }}
               >
                 <KeyRound /> Change passphrase
+              </CommandItem>
+              <CommandItem
+                value="take the tour"
+                onSelect={() => {
+                  setOpen(false);
+                  // Let the palette finish closing so the tour does not start under a dialog.
+                  window.setTimeout(tour.start, 250);
+                }}
+              >
+                <Route /> Take the tour
               </CommandItem>
               <CommandItem
                 value="lock vault"

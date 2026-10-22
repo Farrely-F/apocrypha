@@ -40,3 +40,6 @@ export type RenameValues = z.infer<ReturnType<typeof renameSchema>>;
 /** New organisation: its name, and the first project and environment it starts with. */
 export const newOrganizationSchema = z.object({ organization: name("organisation"), project: name("project"), environment: name("environment") });
 export type NewOrganizationValues = z.infer<typeof newOrganizationSchema>;
+
+export const renameOrganizationSchema = z.object({ name: name("organisation") });
+export type RenameOrganizationValues = z.infer<typeof renameOrganizationSchema>;

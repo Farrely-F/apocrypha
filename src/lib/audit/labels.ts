@@ -15,6 +15,10 @@ export function describeEvent(e: { type: string; actorName: string | null; envNa
   switch (e.type) {
     case "org.created":
       return "created the organisation";
+    case "org.renamed":
+      return "renamed the organisation";
+    case "member.erased":
+      return "erased their account and left the organisation";
     case "project.created":
       return "created a project";
     case "project.renamed":

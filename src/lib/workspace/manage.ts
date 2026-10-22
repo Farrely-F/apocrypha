@@ -4,6 +4,7 @@ import * as schema from "../db/schema";
 import type { OrgRole } from "../db/schema";
 import { insertPersonalWorkspace } from "./queries";
 import { FIRST_KEY_VERSION } from "./shared";
+import { BUILDERS } from "./roles";
 
 type Db = LibSQLDatabase<typeof schema>;
 
@@ -61,8 +62,6 @@ export async function listWorkspaceTree(db: Db, userId: string): Promise<TreeOrg
   }));
 }
 
-/** Only these roles may create projects and environments. */
-const BUILDERS: readonly OrgRole[] = ["owner", "admin"];
 
 async function roleIn(db: Db, userId: string, orgId: string): Promise<OrgRole | null> {
   const [row] = await db
@@ -245,4 +244,31 @@ export async function createOrganization(
     ),
   );
   return { status: "created", ...ids };
+}
+
+/** Owners only. The name is plaintext by design, like project and environment names. */
+export async function renameOrganization(db: Db, userId: string, orgId: string, name: string): Promise<ManageResult> {
+  const role = await roleIn(db, userId, orgId);
+  if (!role) return { status: "not-found" };
+  if (role !== "owner") return { status: "forbidden" };
+  await db.update(schema.organization).set({ name }).where(eq(schema.organization.id, orgId));
+  return { status: "ok" };
+}
+
+/**
+ * Owners only. Removes the organisation with everything in it: members, projects, environments, keys,
+ * every secret version, invites, share links and its audit log (all by cascade). Other members lose access
+ * at once, which is why the caller must say the organisation's name to confirm.
+ */
+export async function deleteOrganization(db: Db, userId: string, orgId: string, confirmName: string): Promise<ManageResult | { status: "name-mismatch" }> {
+  const role = await roleIn(db, userId, orgId);
+  if (!role) return { status: "not-found" };
+  if (role !== "owner") return { status: "forbidden" };
+  const [org] = await db.select({ name: schema.organization.name }).from(schema.organization).where(eq(schema.organization.id, orgId)).limit(1);
+  if (!org) return { status: "not-found" };
+  if (confirmName !== org.name) return { status: "name-mismatch" };
+  // Projects, environments, key grants, secrets and versions, writes, invites, shares, audit rows and
+  // memberships all reference the organisation (or an environment of it) with ON DELETE CASCADE.
+  await db.delete(schema.organization).where(eq(schema.organization.id, orgId));
+  return { status: "ok" };
 }

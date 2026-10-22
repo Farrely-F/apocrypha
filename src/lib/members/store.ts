@@ -38,12 +38,16 @@ export async function listMembers(db: Db, userId: string, orgId: string): Promis
 
 export type RoleResult = "ok" | "forbidden" | "not-found" | "bad-role";
 
-/** Owners promote members to admin and demote admins. Nobody changes an owner here, so an owner always exists. */
+/**
+ * Owners promote members to admin, demote admins, and make someone else an owner. An owner's role is
+ * never changed here and an owner is never removed, so an organisation always has one; making a second
+ * owner is how the first one can leave (or erase their account) without stranding the rest.
+ */
 export async function changeRole(db: Db, actorId: string, orgId: string, targetId: string, role: string): Promise<RoleResult> {
   const actor = await roleIn(db, actorId, orgId);
   if (!actor) return "not-found";
   if (actor !== "owner") return "forbidden";
-  if (role !== "admin" && role !== "member") return "bad-role";
+  if (role !== "owner" && role !== "admin" && role !== "member") return "bad-role";
   const target = await roleIn(db, targetId, orgId);
   if (!target) return "not-found";
   if (target === "owner" || targetId === actorId) return "forbidden";

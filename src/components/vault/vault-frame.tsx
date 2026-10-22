@@ -4,10 +4,11 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { Lock } from "lucide-react";
 import { AppGround, ShellHeader, StatusBar } from "@/components/shell";
 import { Button } from "@/components/ui/button";
+import { TourProvider } from "@/components/tour";
 import { CommandPalette } from "@/components/workspace/command-palette";
 import { WorkspaceNav } from "@/components/workspace/workspace-nav";
 import type { TreeOrg } from "@/lib/workspace/manage";
-import { SignOutButton } from "./sign-out-button";
+import { AccountMenu } from "./account-menu";
 import { UnlockScreen } from "./unlock-screen";
 import { useVault, VaultProvider } from "./vault-provider";
 
@@ -33,7 +34,7 @@ export function StatusInfo({ org, env, keyVersion }: Info) {
  * Locked content is unmounted, not hidden, so a lock also drops whatever the
  * screens held in memory.
  */
-function Frame({ email, tree, children }: { email: string; tree: TreeOrg[]; children: React.ReactNode }) {
+function Frame({ userId, email, tree, children }: { userId: string; email: string; tree: TreeOrg[]; children: React.ReactNode }) {
   const { status, trusted, lock } = useVault();
   const unlocked = status === "unlocked";
   const [info, setInfo] = useState<Info>({});
@@ -43,6 +44,7 @@ function Frame({ email, tree, children }: { email: string; tree: TreeOrg[]; chil
   if (!unlocked) return <div className="h-dvh bg-background" />;
 
   return (
+    <TourProvider userId={userId}>
     <div className="relative flex h-dvh flex-col overflow-hidden bg-background">
       <AppGround />
       <ShellHeader
@@ -51,8 +53,7 @@ function Frame({ email, tree, children }: { email: string; tree: TreeOrg[]; chil
         actions={
           <>
             <CommandPalette tree={tree} />
-            <span className="hidden text-xs text-bone-faint xl:inline">{email}</span>
-            <SignOutButton />
+            <AccountMenu email={email} />
           </>
         }
       />
@@ -77,6 +78,7 @@ function Frame({ email, tree, children }: { email: string; tree: TreeOrg[]; chil
                 type="button"
                 variant="ghost"
                 size="xs"
+                data-tour="lock"
                 className="-mr-2 hover:text-signal"
                 onClick={() => void lock()}
                 aria-label="Lock vault"
@@ -89,15 +91,18 @@ function Frame({ email, tree, children }: { email: string; tree: TreeOrg[]; chil
         }
       />
     </div>
+    </TourProvider>
   );
 }
 
 export function VaultFrame({
+  userId,
   email,
   publicKey,
   tree,
   children,
 }: {
+  userId: string;
   email: string;
   publicKey: string;
   tree: TreeOrg[];
@@ -105,7 +110,7 @@ export function VaultFrame({
 }) {
   return (
     <VaultProvider publicKey={publicKey}>
-      <Frame email={email} tree={tree}>{children}</Frame>
+      <Frame userId={userId} email={email} tree={tree}>{children}</Frame>
     </VaultProvider>
   );
 }

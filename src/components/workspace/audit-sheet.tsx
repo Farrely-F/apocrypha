@@ -78,7 +78,7 @@ export function AuditSheet({ org, open, onOpenChange }: { org: TreeOrg; open: bo
               )}
               {chain.ok && <span className="font-mono text-xs text-bone-faint">head {chain.head.slice(0, 16)}</span>}
               {isOwner && (
-                <Button size="sm" variant="outline" className="ml-auto" render={<a href={`/api/organizations/${org.id}/audit/export`} download />}>
+                <Button nativeButton={false} size="sm" variant="outline" className="ml-auto" render={<a href={`/api/organizations/${org.id}/audit/export`} download />}>
                   <Download data-icon="inline-start" />
                   Export JSON
                 </Button>

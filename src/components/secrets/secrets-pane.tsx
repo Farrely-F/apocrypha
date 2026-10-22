@@ -399,6 +399,7 @@ export function SecretsPane({
                               size="icon-sm"
                               className="[&_svg]:size-4"
                               aria-label="Share secrets"
+                              data-tour="share"
                               disabled={items.length === 0}
                               onClick={() => setSharing(items)}
                             />
@@ -426,7 +427,7 @@ export function SecretsPane({
                         <TooltipContent>Import a .env</TooltipContent>
                       </Tooltip>
                       <span aria-hidden className="mx-1 h-5 w-px bg-hairline-faint" />
-                      <Button size="sm" aria-label="Add secret" onClick={() => setAdding(true)}>
+                      <Button size="sm" data-tour="add" aria-label="Add secret" onClick={() => setAdding(true)}>
                         <Plus data-icon="inline-start" />
                         <span className="hidden sm:inline">Add secret</span>
                       </Button>
@@ -447,11 +448,13 @@ export function SecretsPane({
         )}
 
         {ready && items.length === 0 && (
+          <div data-tour="registry">
           <EmptyState title="The registry is empty">
             {canWrite
               ? "Anything you add is encrypted in this browser with this environment's key before it leaves it."
               : "Nothing has been added here. You can read this environment, but only people with write access can add secrets."}
           </EmptyState>
+          </div>
         )}
         {ready && items.length > 0 && visible.length === 0 && (
           <div className="border-t border-hairline-faint px-5 py-10 text-center">
@@ -497,6 +500,7 @@ export function SecretsPane({
                     <Fragment key={item.id}>
                       <TableRow
                         data-secret={item.name}
+                        data-tour={index === 0 ? "registry" : undefined}
                         data-state={selected.has(item.id) ? "selected" : undefined}
                         className="group/row h-14 border-hairline-faint transition-colors hover:bg-pane/50 data-[state=selected]:bg-signal/[0.06]"
                       >

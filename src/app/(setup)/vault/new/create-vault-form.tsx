@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { Pane } from "@/components/shell";
@@ -23,8 +22,9 @@ import {
   type CreateVaultValues,
   type RecoveryConfirmValues,
 } from "@/lib/vault/schemas";
+import { flagNewVault } from "@/lib/tour/storage";
 import { passphraseStrength, type StrengthLevel } from "@/lib/vault/strength";
-import { lock as lockStore, setUnlockedKeyPair } from "@/lib/vault/unlocked";
+import { lock as lockStore, setUnlockedKeyPair, settled as settledKeystore } from "@/lib/vault/unlocked";
 import {
   DEFAULT_WORKSPACE_NAMES,
   FIRST_KEY_VERSION,
@@ -163,7 +163,6 @@ function RecoveryStep({
   mode: VaultMode;
   onDiscard: () => void;
 }) {
-  const router = useRouter();
   const [copied, setCopied] = useState(false);
   const schema = useMemo(() => recoveryConfirmSchema(vault.recoveryKey), [vault.recoveryKey]);
   const form = useForm<RecoveryConfirmValues>({
@@ -237,9 +236,20 @@ function RecoveryStep({
       // the recovery key and the typed confirmation from state and the DOM now.
       form.reset({ typed: "" });
       onDiscard();
-      // The vault is saved. Land in the new environment; /dashboard resolves
-      // to the same place if the response was unreadable.
-      router.replace(
+      // A first vault gets the tour on the screen it lands on; a reset does not.
+      if (mode === "create") {
+        try {
+          flagNewVault(window.sessionStorage);
+        } catch {
+          // Storage blocked: no tour, nothing else changes.
+        }
+      }
+      // The vault is saved. Land in the new environment (/dashboard if the response was unreadable).
+      // A full page load, not router.replace: Next keeps this page mounted but hidden, refetches
+      // it once the vault exists, and follows its redirect to /dashboard, so the person never
+      // reached the environment. The key must be in the keystore before the page unloads.
+      await settledKeystore();
+      window.location.replace(
         ids?.orgId && ids.projectId && ids.envId
           ? environmentPath({ orgId: ids.orgId, projectId: ids.projectId, envId: ids.envId })
           : "/dashboard",

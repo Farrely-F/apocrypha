@@ -47,7 +47,7 @@ function DialogContent({
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
-  /** Padding and gap of the scrolling body. The popup itself stays unclipped so the corner art can overhang it. */
+  /** Added to the scrolling body's default `gap-6 p-6` (a later class wins). The popup itself stays unclipped so the corner art can overhang it. */
   bodyClassName?: string
 }) {
   return (
@@ -64,7 +64,8 @@ function DialogContent({
         <div
           className={cn(
             "grid max-h-[calc(100dvh-2rem)] grid-cols-[minmax(0,1fr)] overflow-y-auto",
-            bodyClassName ?? "gap-6 p-6"
+            "gap-6 p-6",
+            bodyClassName
           )}
         >
           {children}

@@ -85,13 +85,13 @@ export function JoinScreen({ inviteId }: { inviteId: string }) {
         {state === "signin" && (
           <>
             <p className="text-bone-faint">Sign in to accept. Afterwards, open this same link again in this tab and it will pick up where you left off.</p>
-            <Button render={<Link href="/sign-in" />}>Sign in</Button>
+            <Button nativeButton={false} render={<Link href="/sign-in" />}>Sign in</Button>
           </>
         )}
         {state === "novault" && (
           <>
             <p className="text-bone-faint">Create your vault first, then open this link again in this tab.</p>
-            <Button render={<Link href="/vault/new" />}>Create vault</Button>
+            <Button nativeButton={false} render={<Link href="/vault/new" />}>Create vault</Button>
           </>
         )}
         {state === "invalid" && (

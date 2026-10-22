@@ -3,9 +3,9 @@ import type { LibSQLDatabase } from "drizzle-orm/libsql";
 import * as schema from "../db/schema";
 import type { OrgRole } from "../db/schema";
 import { checkWrappedKey } from "../vault/payload";
+import { BUILDERS } from "../workspace/roles";
 
 type Db = LibSQLDatabase<typeof schema>;
-const BUILDERS: readonly OrgRole[] = ["owner", "admin"];
 export type Level = "none" | "read" | "write";
 const algOf = (publicKey: string) => (publicKey.split("|")[1] === "p256" ? "p256" : "x25519");
 

@@ -3,11 +3,11 @@ import { and, eq, gt, inArray, isNull } from "drizzle-orm";
 import type { LibSQLDatabase } from "drizzle-orm/libsql";
 import * as schema from "../db/schema";
 import type { OrgRole } from "../db/schema";
+import { BUILDERS } from "../workspace/roles";
 
 type Db = LibSQLDatabase<typeof schema>;
 
 export const INVITE_TTL_MS = 48 * 60 * 60 * 1000;
-const BUILDERS: readonly OrgRole[] = ["owner", "admin"];
 
 /** Hash of the fragment secret, as stored. Empty secrets never match (the column default is empty). */
 export const hashRedeemToken = (token: string) => createHash("sha256").update(token).digest("hex");

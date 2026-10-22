@@ -3,9 +3,9 @@ import type { LibSQLDatabase } from "drizzle-orm/libsql";
 import * as schema from "../db/schema";
 import type { OrgRole } from "../db/schema";
 import { checkWrappedKey } from "../vault/payload";
+import { BUILDERS } from "../workspace/roles";
 
 type Db = LibSQLDatabase<typeof schema>;
-const BUILDERS: readonly OrgRole[] = ["owner", "admin"];
 
 async function roleIn(db: Db, userId: string, orgId: string): Promise<OrgRole | null> {
   const [row] = await db

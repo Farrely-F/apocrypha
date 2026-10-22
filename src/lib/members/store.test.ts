@@ -49,10 +49,25 @@ describe("members and roles", () => {
     expect(await listMembers(db, "erin", ws.orgId)).toBeNull();
     expect(await changeRole(db, "dave", ws.orgId, "bob", "admin")).toBe("forbidden");
     expect(await changeRole(db, "erin", ws.orgId, "bob", "admin")).toBe("not-found");
-    expect(await changeRole(db, "alice", ws.orgId, "bob", "owner")).toBe("bad-role");
+    expect(await changeRole(db, "alice", ws.orgId, "bob", "superuser")).toBe("bad-role");
     expect(await changeRole(db, "alice", ws.orgId, "alice", "member")).toBe("forbidden");
     expect(await changeRole(db, "alice", ws.orgId, "bob", "admin")).toBe("ok");
     expect(await changeRole(db, "alice", ws.orgId, "bob", "member")).toBe("ok");
+  });
+});
+
+describe("making a co-owner", () => {
+  it("lets an owner (only) promote someone, after which that person is untouchable like any owner", async () => {
+    await db.insert(schema.user).values({ id: "pat", name: "pat", email: "pat@example.com" });
+    await db.insert(schema.member).values({ id: crypto.randomUUID(), organizationId: ws.orgId, userId: "pat", role: "member" });
+    expect(await changeRole(db, "dave", ws.orgId, "pat", "owner")).toBe("forbidden"); // an admin cannot
+    expect(await changeRole(db, "alice", ws.orgId, "pat", "owner")).toBe("ok");
+    expect((await listMembers(db, "alice", ws.orgId))!.find((m) => m.userId === "pat")!.role).toBe("owner");
+    expect(await changeRole(db, "alice", ws.orgId, "pat", "member")).toBe("forbidden"); // owners are not demoted
+    expect((await planRemoval(db, "alice", ws.orgId, "pat")).status).toBe("forbidden"); // nor removed
+    // and the new owner has an owner's powers
+    expect(await changeRole(db, "pat", ws.orgId, "bob", "admin")).toBe("ok");
+    expect(await changeRole(db, "pat", ws.orgId, "bob", "member")).toBe("ok");
   });
 });
 
