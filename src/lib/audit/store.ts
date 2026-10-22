@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lt, or, sql, type SQL } from "drizzle-orm";
 import type { LibSQLDatabase } from "drizzle-orm/libsql";
 import * as schema from "../db/schema";
 import type { OrgRole } from "../db/schema";
@@ -77,24 +77,35 @@ async function roleIn(db: Db, userId: string, orgId: string): Promise<OrgRole | 
 export type AuditRow = ChainEntry & { id: string; actorName: string | null; envName: string | null; targetName: string | null };
 
 /**
+ * Which audit events a person may see in one organisation, as a WHERE clause. Owners and admins see the whole
+ * log. A member sees events on environments they hold, and events about or by themselves. Null for a stranger.
+ * One place for the rule, used by the log itself and by anything that counts it.
+ */
+export async function auditScope(db: Db, userId: string, orgId: string): Promise<{ full: boolean; where: SQL | undefined } | null> {
+  const role = await roleIn(db, userId, orgId);
+  if (!role) return null;
+  const full = role === "owner" || role === "admin";
+  if (full) return { full, where: undefined };
+  const held = (
+    await db
+      .select({ envId: schema.environmentKeyGrant.envId })
+      .from(schema.environmentKeyGrant)
+      .where(and(eq(schema.environmentKeyGrant.principalType, "user"), eq(schema.environmentKeyGrant.principalId, userId)))
+  ).map((g) => g.envId);
+  return {
+    full,
+    where: or(eq(schema.auditEvent.actorId, userId), eq(schema.auditEvent.targetUserId, userId), held.length ? inArray(schema.auditEvent.envId, held) : sql`0`),
+  };
+}
+
+/**
  * Newest first. Owners and admins see the whole org log. A member sees events on environments they
  * hold, and events about or by themselves. Anyone else gets null.
  */
 export async function listAudit(db: Db, userId: string, orgId: string, opts: { before?: number; limit?: number } = {}): Promise<{ events: AuditRow[]; scope: "org" | "own" } | null> {
-  const role = await roleIn(db, userId, orgId);
-  if (!role) return null;
-  const full = role === "owner" || role === "admin";
-  const held = full
-    ? null
-    : (
-        await db
-          .select({ envId: schema.environmentKeyGrant.envId })
-          .from(schema.environmentKeyGrant)
-          .where(and(eq(schema.environmentKeyGrant.principalType, "user"), eq(schema.environmentKeyGrant.principalId, userId)))
-      ).map((g) => g.envId);
-  const scope = full
-    ? undefined
-    : or(eq(schema.auditEvent.actorId, userId), eq(schema.auditEvent.targetUserId, userId), held && held.length ? inArray(schema.auditEvent.envId, held) : sql`0`);
+  const visible = await auditScope(db, userId, orgId);
+  if (!visible) return null;
+  const { full, where: scope } = visible;
   const actor = schema.user;
   const rows = await db
     .select({

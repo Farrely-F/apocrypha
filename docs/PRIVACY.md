@@ -21,6 +21,8 @@ For people who **run** an Apocrypha server. This is an engineering description o
 | Secrets you wrote in an organisation that continues | `secret`, `secret_version` | They belong to the organisation | **Kept**, with your id as an opaque author reference |
 | Audit events where you acted or were the target, in organisations that continue | `audit_event` | Security record | **Kept**, with your id as an opaque reference |
 
+The dashboard's charts and counts are computed on request from rows the server already holds (counts, dates, the audit log a person may read); nothing is collected for them, nothing is stored, and nothing is sent to anyone. They follow the same visibility rules as the rest of the app: a person is counted only into environments whose key they hold, and sees the audit entries they are allowed to see. The secrets themselves are never opened for this.
+
 The app itself sets no analytics or advertising cookies and loads no third-party scripts. Cookies are the session, the two-factor challenge and the "don't ask for a code on this browser" marker, all first-party. Fonts are served by Next from the same origin.
 
 ## Rights and where they live in the app
