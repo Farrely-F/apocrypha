@@ -19,3 +19,6 @@ export const FIRST_KEY_VERSION = 1;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (s: string) => UUID.test(s);
+
+export const orgPath = (orgId: string) => `/o/${orgId}`;
+export const projectPath = (orgId: string, projectId: string) => `/o/${orgId}/p/${projectId}`;

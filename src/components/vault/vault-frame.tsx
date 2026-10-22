@@ -2,8 +2,9 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { Lock } from "lucide-react";
-import { ShellHeader, StatusBar } from "@/components/shell";
+import { AppGround, ShellHeader, StatusBar } from "@/components/shell";
 import { Button } from "@/components/ui/button";
+import { CommandPalette } from "@/components/workspace/command-palette";
 import { WorkspaceNav } from "@/components/workspace/workspace-nav";
 import type { TreeOrg } from "@/lib/workspace/manage";
 import { SignOutButton } from "./sign-out-button";
@@ -47,15 +48,19 @@ function Frame({ email, tree, children }: { email: string; tree: TreeOrg[]; chil
         nav={unlocked ? <WorkspaceNav tree={tree} /> : undefined}
         actions={
           <>
+            <CommandPalette tree={tree} />
             <span className="hidden text-xs text-bone-faint sm:inline">{email}</span>
             <SignOutButton />
           </>
         }
       />
-      <div id="main" className="min-h-0 flex-1 overflow-y-auto">
-        <InfoContext.Provider value={setInfo}>
-          <div className="p-4 sm:p-6">{children}</div>
-        </InfoContext.Provider>
+      <div className="relative min-h-0 flex-1">
+        <AppGround />
+        <div id="main" className="absolute inset-0 overflow-y-auto">
+          <InfoContext.Provider value={setInfo}>
+            <div className="p-4 sm:p-6">{children}</div>
+          </InfoContext.Provider>
+        </div>
       </div>
       <StatusBar
         org={unlocked ? info.org : null}
@@ -68,8 +73,9 @@ function Frame({ email, tree, children }: { email: string; tree: TreeOrg[]; chil
               {trusted && <span className="text-bone-faint">trusted device</span>}
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="xs"
+                className="-mr-2 hover:text-signal"
                 onClick={() => void lock()}
                 aria-label="Lock vault"
               >

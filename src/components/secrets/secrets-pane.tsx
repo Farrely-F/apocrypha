@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { Check, Copy, Download, Ellipsis, Eye, EyeOff, History, Link2, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { Pane } from "@/components/shell";
 import { useVault } from "@/components/vault";
+import { EmptyState } from "@/components/brand/empty-state";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -27,7 +28,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -306,7 +306,7 @@ export function SecretsPane({
                   placeholder="Filter by name"
                   autoComplete="off"
                   spellCheck={false}
-                  className="max-w-56"
+                  className="min-w-0 flex-1 sm:max-w-56 sm:flex-none"
                 />
                 <Select value={sort} onValueChange={(v) => v && setSort(v as Sort)} items={SORTS}>
                   <SelectTrigger aria-label="Sort secrets" className="w-32">
@@ -324,7 +324,7 @@ export function SecretsPane({
                   <DropdownMenu>
                     <DropdownMenuTrigger render={<Button size="sm" variant="outline" disabled={items.length === 0} />}>
                       <Download data-icon="inline-start" />
-                      Export
+                      <span className="hidden sm:inline">Export</span>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuGroup>
@@ -341,15 +341,15 @@ export function SecretsPane({
                     <>
                       <Button size="sm" variant="outline" disabled={items.length === 0} onClick={() => setSharing(items)}>
                         <Link2 data-icon="inline-start" />
-                        Share
+                        <span className="hidden sm:inline">Share</span>
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => setImporting(true)}>
                         <Upload data-icon="inline-start" />
-                        Import
+                        <span className="hidden sm:inline">Import</span>
                       </Button>
                       <Button size="sm" onClick={() => setAdding(true)}>
                         <Plus data-icon="inline-start" />
-                        Add secret
+                        <span className="hidden sm:inline">Add secret</span>
                       </Button>
                     </>
                   )}
@@ -366,14 +366,27 @@ export function SecretsPane({
         )}
 
         {ready && items.length === 0 && (
-          <Empty className="mt-4 items-start p-0 text-left">
-            <EmptyHeader className="items-start text-left">
-              <EmptyTitle>No secrets yet</EmptyTitle>
-              <EmptyDescription>
-                Anything you add here is encrypted in this browser with this environment&apos;s key before it leaves it.
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
+          <EmptyState
+            title="No secrets yet"
+            actions={
+              canWrite ? (
+                <>
+                  <Button size="sm" onClick={() => setAdding(true)}>
+                    <Plus data-icon="inline-start" />
+                    Add secret
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setImporting(true)}>
+                    <Upload data-icon="inline-start" />
+                    Import a .env
+                  </Button>
+                </>
+              ) : undefined
+            }
+          >
+            {canWrite
+              ? "Anything you add is encrypted in this browser with this environment's key before it leaves it."
+              : "Nothing has been added here. You can read this environment, but only people with write access can add secrets."}
+          </EmptyState>
         )}
         {ready && items.length > 0 && visible.length === 0 && <p className="mt-4 text-bone-dim">No secret matches &ldquo;{filter}&rdquo;.</p>}
 
@@ -392,8 +405,8 @@ export function SecretsPane({
                   />
                 </TableHead>
                 <TableHead>Name</TableHead>
-                <TableHead className="w-[40%]">Value</TableHead>
-                <TableHead className="w-28 text-right">
+                <TableHead className="hidden w-[40%] sm:table-cell">Value</TableHead>
+                <TableHead className="w-24 text-right sm:w-28">
                   <span className="sr-only">Actions</span>
                 </TableHead>
               </TableRow>
@@ -412,8 +425,8 @@ export function SecretsPane({
                           onCheckedChange={() => setSelected(flip(selected, item.id))}
                         />
                       </TableCell>
-                      <TableCell className="font-medium break-all whitespace-normal text-bone">{item.name}</TableCell>
-                      <TableCell>
+                      <TableCell className="max-w-0 font-medium break-words whitespace-normal text-bone sm:max-w-none">{item.name}</TableCell>
+                      <TableCell className="hidden sm:table-cell">
                         <span data-testid={`value-${item.name}`} className={shown ? "text-signal" : "text-bone-faint"}>
                           {shown ? (
                             <span className="line-clamp-2 break-all whitespace-pre-wrap">{item.value}</span>

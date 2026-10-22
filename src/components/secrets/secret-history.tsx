@@ -100,27 +100,36 @@ export function SecretHistory({
       {!versions && !error && <p className="text-bone-faint">Opening the history...</p>}
 
       {versions && (
-        <div className="grid gap-4 md:grid-cols-[13rem_minmax(0,1fr)]">
-          <ol className="flex flex-col gap-1">
+        <div className="grid gap-6">
+          <ol className="relative flex flex-col before:absolute before:top-3 before:bottom-3 before:left-[0.4375rem] before:w-px before:bg-hairline-faint">
             {[...versions].reverse().map((v) =>
               v.ok ? (
                 <li key={v.version}>
-                  <Button
-                    variant={selected?.version === v.version ? "secondary" : "outline"}
-                    size="sm"
-                    className="h-auto w-full flex-col items-start gap-0 py-1.5 text-left"
+                  <button
+                    type="button"
                     onClick={() => setPicked(v.version)}
                     aria-current={selected?.version === v.version}
+                    className="group/ver relative flex w-full items-start gap-4 py-2 pr-2 text-left outline-none focus-visible:outline-1 focus-visible:outline-signal"
                   >
-                    <span className="text-bone">
-                      Version {v.version}
-                      {v.deleted ? " (deleted)" : ""}
-                      {v.version === latest?.version ? " (current)" : ""}
+                    <span
+                      aria-hidden
+                      className={`relative z-10 mt-1.5 size-[0.9375rem] shrink-0 border bg-background transition-colors ${
+                        selected?.version === v.version
+                          ? "border-signal after:absolute after:inset-[3px] after:bg-signal"
+                          : "border-hairline group-hover/ver:border-signal-dim"
+                      }`}
+                    />
+                    <span className="grid min-w-0 gap-0.5">
+                      <span className={selected?.version === v.version ? "text-bone" : "text-bone-dim group-hover/ver:text-bone"}>
+                        Version {v.version}
+                        {v.deleted ? " (deleted)" : ""}
+                        {v.version === latest?.version ? " (current)" : ""}
+                      </span>
+                      <span className="text-xs text-bone-faint">
+                        {who(v)}, {ago(v.createdAt)}
+                      </span>
                     </span>
-                    <span className="text-xs text-bone-faint">
-                      {who(v)}, {ago(v.createdAt)}
-                    </span>
-                  </Button>
+                  </button>
                 </li>
               ) : (
                 <li key={v.version}>
@@ -135,7 +144,7 @@ export function SecretHistory({
           </ol>
 
           {selected && (
-            <div className="min-w-0">
+            <div className="min-w-0 border-t border-hairline-faint pt-5">
               <p className="text-xs text-bone-faint">
                 {before ? `Version ${selected.version} compared with version ${before.version}` : `Version ${selected.version} is the first`}
               </p>

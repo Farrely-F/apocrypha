@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { AppLoading } from "@/components/shell";
 import { VaultFrame } from "@/components/vault";
 import { requireSession } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
@@ -27,7 +28,7 @@ async function SessionGate({ children }: { children: React.ReactNode }) {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<AppLoading />}>
       <SessionGate>{children}</SessionGate>
     </Suspense>
   );

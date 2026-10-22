@@ -70,10 +70,14 @@ export function StatusBar({
     <footer
       aria-label="Vault status"
       className={cn(
-        "flex h-8 items-stretch overflow-x-auto border-t border-hairline bg-background text-xs whitespace-nowrap",
+        "relative isolate flex h-8 items-stretch overflow-x-auto border-t border-hairline bg-background text-xs whitespace-nowrap",
         className,
       )}
     >
+      <div
+        aria-hidden
+        className="mora-tex-stacks-painted pointer-events-none absolute inset-0 -z-10 opacity-[0.18] [mask-image:linear-gradient(to_right,#000,transparent_70%)]"
+      />
       <Segment label="org">
         <Value value={org} />
       </Segment>

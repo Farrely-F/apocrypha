@@ -6,7 +6,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { describeEvent } from "@/lib/audit/labels";
 import type { TreeOrg } from "@/lib/workspace/manage";
 
@@ -87,31 +86,22 @@ export function AuditSheet({ org, open, onOpenChange }: { org: TreeOrg; open: bo
             </div>
           )}
 
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-44">When</TableHead>
-                <TableHead className="w-36">Who</TableHead>
-                <TableHead>What</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {events.map((e) => (
-                <TableRow key={e.id}>
-                  <TableCell className="text-xs text-bone-faint">{new Date(e.createdAt).toLocaleString()}</TableCell>
-                  <TableCell className="truncate">{e.actorName ?? "guest"}</TableCell>
-                  <TableCell className="whitespace-normal">{describeEvent(e)}</TableCell>
-                </TableRow>
-              ))}
-              {loaded && events.length === 0 && !error && (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-bone-faint">
-                    Nothing recorded yet.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <ol className="relative flex flex-col before:absolute before:top-3 before:bottom-3 before:left-[0.4375rem] before:w-px before:bg-hairline-faint">
+            {events.map((e) => (
+              <li key={e.id} className="relative flex items-start gap-4 py-2.5">
+                <span aria-hidden className="relative z-10 mt-1.5 size-[0.9375rem] shrink-0 border border-hairline bg-background" />
+                <div className="grid min-w-0 gap-0.5">
+                  <p className="text-bone break-words">{describeEvent(e)}</p>
+                  <p className="text-xs text-bone-faint">
+                    {e.actorName ?? "guest"}, {new Date(e.createdAt).toLocaleString()}
+                  </p>
+                </div>
+              </li>
+            ))}
+            {loaded && events.length === 0 && !error && (
+              <li className="py-2 pl-8 text-bone-faint">Nothing recorded yet.</li>
+            )}
+          </ol>
           {more && (
             <div>
               <Button size="sm" variant="outline" onClick={() => void load(events.at(-1)?.seq)}>

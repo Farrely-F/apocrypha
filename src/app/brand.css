@@ -142,3 +142,21 @@
     line-height: 1;
   }
 }
+
+/* ---------- painted corner art ---------- */
+/* Gothic brackets on two corners of an untitled surface (dialogs), straddling the border. Needs the
+   element to be positioned already; it sets no position of its own so fixed popups keep theirs. */
+@utility mora-frame-art {
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    z-index: 1;
+    width: 44px;
+    aspect-ratio: 683 / 1033;
+    background: url("/brand/frame-corner.webp") center / contain no-repeat;
+    pointer-events: none;
+  }
+  &::before { top: -4px; left: -4px; }
+  &::after { right: -4px; bottom: -4px; rotate: 180deg; }
+}

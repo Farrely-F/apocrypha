@@ -34,7 +34,6 @@ import { useVault } from "@/components/vault/vault-provider";
 import { MembersDialog } from "@/components/workspace/members-dialog";
 import { AuditSheet } from "@/components/workspace/audit-sheet";
 import { InviteDialog } from "@/components/workspace/invite-dialog";
-import { CommandPalette } from "@/components/workspace/command-palette";
 import { generateEnvironmentKey, wrapEnvironmentKey } from "@/lib/crypto";
 import {
   newEnvironmentSchema,
@@ -218,7 +217,6 @@ export function WorkspaceNav({ tree }: { tree: TreeOrg[] }) {
           taken={new Set(project.environments.map((e) => e.name.toLowerCase()))}
         />
       )}
-      <CommandPalette org={org} />
 
       {manage && project && (
         <ManageDialog
