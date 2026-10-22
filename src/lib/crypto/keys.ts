@@ -84,37 +84,120 @@ export async function exportPrivateKey(key: CryptoKey): Promise<Bytes> {
   }
 }
 
-/** Import a PKCS#8 private key; the public key is derived from it. */
+/** RFC 8410 PrivateKeyInfo for X25519: this prefix, then the 32-byte scalar. */
+const X25519_PKCS8_PREFIX = [
+  0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x6e, 0x04, 0x22, 0x04, 0x20,
+];
+const X25519_BASE_POINT = Uint8Array.from({ length: 32 }, (_, i) => (i === 0 ? 9 : 0));
+
+/** Which WebCrypto call refused, and how: names only, never key material. */
+function step(name: string, e: unknown): string {
+  return `${name}: ${e instanceof Error && e.name ? e.name : "failed"}`;
+}
+
+/** The scalar inside an RFC 8410 X25519 PKCS#8 blob, or undefined for any other shape. */
+function x25519Scalar(pkcs8: Uint8Array): Uint8Array | undefined {
+  const n = X25519_PKCS8_PREFIX.length;
+  if (pkcs8.length !== n + 32) return undefined;
+  return X25519_PKCS8_PREFIX.every((b, i) => pkcs8[i] === b) ? pkcs8.slice(n) : undefined;
+}
+
+/** X25519 public key = private key times the base point; no JWK export needed. */
+async function x25519Public(privateKey: CryptoKey): Promise<Bytes> {
+  const base = await subtle().importKey("raw", toBytes(X25519_BASE_POINT), params("x25519"), false, []);
+  return new Uint8Array(
+    await subtle().deriveBits({ name: "X25519", public: base }, privateKey, 256),
+  );
+}
+
+/** P-256 has no such shortcut: its public point comes from the JWK of an extractable copy. */
+async function p256Public(extractableKey: CryptoKey): Promise<Bytes> {
+  const jwk = await subtle().exportKey("jwk", extractableKey);
+  if (!jwk.x || !jwk.y) throw malformed("private key");
+  return new Uint8Array([4, ...fromB64u(jwk.x), ...fromB64u(jwk.y)]);
+}
+
+/**
+ * Import a PKCS#8 private key; the public key is derived from it.
+ *
+ * Some WebKit builds are picky about PKCS#8 or JWK for X25519, so each step is
+ * tried a second way before giving up. `expectedPublicKey` (the one the server
+ * holds for this account) lets an X25519 scalar load as a JWK when the PKCS#8
+ * import is refused; the result is accepted only if it derives that same key.
+ * A refusal carries the failing step in its message, so a user report says
+ * where, not just that.
+ */
 export async function importKeyPair(
   pkcs8: Uint8Array,
   alg: KeyAlg,
-  opts: { extractable?: boolean } = {},
+  opts: { extractable?: boolean; expectedPublicKey?: string } = {},
 ): Promise<KeyPair> {
   const p = params(alg);
-  // A key made in a browser with X25519 cannot be opened in one without it. Say so,
-  // instead of reporting a good passphrase as a damaged key.
-  if (alg === "x25519" && !(await supportsX25519())) {
-    throw new CryptoError("unsupported", "X25519 is not supported by this runtime");
+  const extractable = opts.extractable ?? false;
+  const usages: KeyUsage[] = ["deriveBits"];
+  const tried: string[] = [];
+
+  if (alg === "p256") {
+    let probe: CryptoKey;
+    let raw: Bytes;
+    try {
+      probe = await subtle().importKey("pkcs8", toBytes(pkcs8), p, true, usages);
+      raw = await p256Public(probe);
+    } catch {
+      throw malformed("private key");
+    }
+    const privateKey = extractable
+      ? probe
+      : await subtle().importKey("pkcs8", toBytes(pkcs8), p, false, usages);
+    return { alg, publicKey: formatPublicKey(alg, raw), privateKey };
   }
-  let probe: CryptoKey;
-  let jwk: JsonWebKey;
+
+  let privateKey: CryptoKey | undefined;
   try {
-    probe = await subtle().importKey("pkcs8", toBytes(pkcs8), p, true, ["deriveBits"]);
-    jwk = await subtle().exportKey("jwk", probe);
-  } catch {
-    throw malformed("private key");
+    privateKey = await subtle().importKey("pkcs8", toBytes(pkcs8), p, extractable, usages);
+  } catch (e) {
+    tried.push(step("import pkcs8", e));
   }
+
+  if (!privateKey && opts.expectedPublicKey) {
+    const d = x25519Scalar(pkcs8);
+    const known = (() => {
+      try {
+        return parsePublicKey(opts.expectedPublicKey as string);
+      } catch {
+        return undefined;
+      }
+    })();
+    if (d && known?.alg === "x25519") {
+      try {
+        privateKey = await subtle().importKey(
+          "jwk",
+          { kty: "OKP", crv: "X25519", d: b64u(d), x: b64u(known.raw) },
+          p,
+          extractable,
+          usages,
+        );
+      } catch (e) {
+        tried.push(step("import jwk", e));
+      }
+    }
+  }
+
+  if (!privateKey) {
+    throw new CryptoError("unsupported", `X25519 key could not be loaded (${tried.join("; ")})`);
+  }
+
   let raw: Bytes;
-  if (alg === "x25519") {
-    if (!jwk.x) throw malformed("private key");
-    raw = fromB64u(jwk.x);
-  } else {
-    if (!jwk.x || !jwk.y) throw malformed("private key");
-    raw = new Uint8Array([4, ...fromB64u(jwk.x), ...fromB64u(jwk.y)]);
+  try {
+    raw = await x25519Public(privateKey);
+  } catch (e) {
+    tried.push(step("derive public key", e));
+    const expected = opts.expectedPublicKey;
+    // The key loaded but its public half cannot be computed here; trust the server's, which
+    // the wrapped env keys already commit to (a wrong one fails to unwrap, it cannot leak).
+    if (!expected) throw new CryptoError("unsupported", `X25519 key could not be used (${tried.join("; ")})`);
+    return { alg, publicKey: expected, privateKey };
   }
-  const privateKey = opts.extractable
-    ? probe
-    : await subtle().importKey("pkcs8", toBytes(pkcs8), p, false, ["deriveBits"]);
   return { alg, publicKey: formatPublicKey(alg, raw), privateKey };
 }
 

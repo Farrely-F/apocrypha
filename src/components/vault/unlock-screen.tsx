@@ -38,7 +38,9 @@ function unlockFailure(err: unknown): string {
   }
   if (err instanceof CryptoError) {
     if (err.code === "unsupported") {
-      return "Your passphrase is right, but this browser cannot load your vault key (it needs X25519: iOS and Safari 17 or newer, or a recent Chrome or Firefox). Update the browser or iOS, or unlock from another browser.";
+      // The message names only the refused WebCrypto step (never key material), so a report says where.
+      const step = /\(([^()]*)\)$/.exec(err.message)?.[1];
+      return `Your passphrase is right, but this browser cannot load your vault key (it needs X25519: iOS and Safari 17 or newer, or a recent Chrome or Firefox). Update the browser or iOS, or unlock from another browser.${step ? ` [${step}]` : ""}`;
     }
     return WRONG;
   }
@@ -102,7 +104,7 @@ export function UnlockScreen({ email }: { email: string }) {
     await new Promise((r) => setTimeout(r, 40));
     let keyPair;
     try {
-      keyPair = await unlockVault(load.me.passphraseBlob, values.passphrase);
+      keyPair = await unlockVault(load.me.passphraseBlob, values.passphrase, load.me.publicKey);
       // The unlocked key must be the one the server holds the public half of.
       if (keyPair.publicKey !== load.me.publicKey) throw new CryptoError("decryption-failed", "mismatch");
     } catch (err) {
