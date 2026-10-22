@@ -19,31 +19,38 @@ import { devSignInSchema, type DevSignInValues } from "@/lib/auth/schemas";
  * is the painted library (AuthGround), behind a solid pane so the form stays
  * readable.
  */
+const PROVIDERS = [
+  { id: "google", name: "Google", env: "GOOGLE_CLIENT_ID" },
+  { id: "github", name: "GitHub", env: "GITHUB_CLIENT_ID" },
+] as const;
+type ProviderId = (typeof PROVIDERS)[number]["id"];
+
 export function SignInScreen({
-  githubEnabled,
+  providers,
   testAuth,
   error,
 }: {
-  githubEnabled: boolean;
+  providers: Record<ProviderId, boolean>;
   testAuth: boolean;
   error: string | null;
 }) {
-  const [redirecting, setRedirecting] = useState(false);
-  const [githubError, setGithubError] = useState<string | null>(null);
+  const [redirecting, setRedirecting] = useState<ProviderId | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
+  const missing = PROVIDERS.filter((p) => !providers[p.id]);
 
-  async function github() {
-    setGithubError(null);
-    setRedirecting(true);
+  async function social(provider: ProviderId, name: string) {
+    setStartError(null);
+    setRedirecting(provider);
     try {
-      const res = await authClient.signIn.social({ provider: "github", callbackURL: "/dashboard" });
+      const res = await authClient.signIn.social({ provider, callbackURL: "/dashboard" });
       if (res?.error) throw new Error(res.error.message);
     } catch {
-      setRedirecting(false);
-      setGithubError("Could not start the GitHub sign-in. Check your connection and try again.");
+      setRedirecting(null);
+      setStartError(`Could not start the ${name} sign-in. Check your connection and try again.`);
     }
   }
 
-  const shown = githubError ?? error;
+  const shown = startError ?? error;
 
   return (
     <div className="w-full max-w-md">
@@ -60,14 +67,28 @@ export function SignInScreen({
           )}
 
           <div className="mt-6 flex flex-col gap-3">
-            <Button size="lg" disabled={!githubEnabled || redirecting} onClick={() => void github()}>
-              {redirecting ? "Opening GitHub" : "Continue with GitHub"}
-            </Button>
-            {!githubEnabled && (
-              <Alert data-testid="github-off">
+            {PROVIDERS.map((p) => (
+              <Button
+                key={p.id}
+                size="lg"
+                variant={p.id === PROVIDERS.find((q) => providers[q.id])?.id ? "default" : "outline"}
+                disabled={!providers[p.id] || redirecting !== null}
+                onClick={() => void social(p.id, p.name)}
+              >
+                {redirecting === p.id ? `Opening ${p.name}` : `Continue with ${p.name}`}
+              </Button>
+            ))}
+            {missing.length > 0 && (
+              <Alert data-testid="providers-off">
                 <AlertDescription>
-                  GitHub sign-in isn&apos;t set up on this server. Set <code>GITHUB_CLIENT_ID</code> and{" "}
-                  <code>GITHUB_CLIENT_SECRET</code> (see <code>.env.example</code>).
+                  {missing.map((p) => p.name).join(" and ")} sign-in {missing.length > 1 ? "aren't" : "isn't"} set up on this
+                  server. Set {missing.map((p) => `${p.env}`).map((id, i) => (
+                    <span key={id}>
+                      {i > 0 && " and "}
+                      <code>{id}</code> and <code>{id.replace("_ID", "_SECRET")}</code>
+                    </span>
+                  ))}{" "}
+                  and restart the server (see <code>.env.example</code>).
                 </AlertDescription>
               </Alert>
             )}
@@ -104,6 +125,8 @@ function DevSignIn() {
       form.setError("root.server", { message: res.error.message ?? "That didn't work." });
       return;
     }
+    // Two-factor accounts are sent to the code page by the auth client itself.
+    if ((res.data as { twoFactorRedirect?: boolean } | null)?.twoFactorRedirect) return;
     router.replace("/dashboard");
   }
 

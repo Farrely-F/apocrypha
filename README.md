@@ -20,7 +20,7 @@ npm run db:migrate           # or `npm run db:reset` to wipe the local SQLite fi
 npm run dev
 ```
 
-GitHub OAuth callback: `http://localhost:3000/api/auth/callback/github`.
+GitHub OAuth callback: `http://localhost:3000/api/auth/callback/github`. Google (optional): `http://localhost:3000/api/auth/callback/google`, with `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 
 `DATABASE_URL` is either a Turso URL (`libsql://...`) or a local file (`file:./data/apocrypha.db`) for self-hosting.
 

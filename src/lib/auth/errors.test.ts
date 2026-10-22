@@ -9,7 +9,7 @@ describe("signInErrorMessage", () => {
 
   it("explains the cases a person can act on", () => {
     expect(signInErrorMessage("access_denied")).toMatch(/cancel|denied|didn't allow/i);
-    expect(signInErrorMessage("account_not_linked")).toMatch(/already|another/i);
+    expect(signInErrorMessage("account_not_linked")).toMatch(/verified|link/i);
     expect(signInErrorMessage("email_not_found")).toMatch(/email/i);
   });
 

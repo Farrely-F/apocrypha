@@ -8,18 +8,22 @@ Apocrypha runs as one container with one SQLite (libSQL) file on a volume. There
 
 - Docker with Compose.
 - A public **HTTPS** URL in front of the container (Caddy, nginx, Traefik, a cloud load balancer). Browsers only allow the crypto APIs Apocrypha uses on `https://` pages (and `localhost`), so plain `http://` on a real hostname will not work.
-- A GitHub OAuth app for sign-in (<https://github.com/settings/developers>). Callback URL: `<your URL>/api/auth/callback/github`.
+- At least one sign-in provider:
+  - GitHub: an OAuth app (<https://github.com/settings/developers>). Callback URL: `<your URL>/api/auth/callback/github`.
+  - Google: an OAuth **web client** in Google Cloud (APIs & Services, Credentials). Authorised redirect URI: `<your URL>/api/auth/callback/google`. If you already have a Firebase project, its Google sign-in uses such a client (the "Web client (auto created by Google Service)" in the project's Cloud console): reuse its ID and secret, and add the redirect URI above. No Firebase SDK is involved.
+
+The same verified email from both providers is one account. People can link and unlink providers, turn on authenticator-app (TOTP) sign-in, and see or revoke their sessions at `/settings`.
 
 ## Start
 
 ```bash
 cp .env.example .env
 # edit .env: set BETTER_AUTH_SECRET (openssl rand -base64 32), BETTER_AUTH_URL (your public https URL),
-# GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET
+# GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET, and/or GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET
 docker compose up -d
 ```
 
-The first start creates the database on the `apocrypha-data` volume and applies every migration. Open `BETTER_AUTH_URL`, sign in with GitHub, and create your vault.
+The first start creates the database on the `apocrypha-data` volume and applies every migration. Open `BETTER_AUTH_URL`, sign in, and create your vault.
 
 Check that it is healthy: `curl http://localhost:3000/api/health` returns `{"ok":true}`, and `docker compose ps` shows `healthy`.
 
@@ -32,11 +36,12 @@ Everything is an environment variable.
 | `BETTER_AUTH_SECRET` | yes | Signs sessions. Long and random. Changing it signs everyone out. |
 | `BETTER_AUTH_URL` | yes | The public URL users open, with no trailing slash. Used for OAuth callbacks and origin checks, and (set at build time, which `docker compose` does) for the landing page's canonical, share-preview and sitemap URLs. |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | for GitHub sign-in | OAuth app credentials. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | for Google sign-in | OAuth web client credentials. |
 | `DATABASE_URL` | no | Defaults to `file:/data/apocrypha.db` in the container. A `libsql://` Turso URL also works (then set `DATABASE_AUTH_TOKEN`). |
 | `AUDIT_RETENTION_DAYS` | no | How long audit events are kept. Default 180. |
 | `TRUSTED_PROXY_HOPS` | no | How many reverse proxies sit in front of the container. Default 1. Used to find the client address for rate limits: set `0` if you are not behind a proxy that sets `X-Forwarded-For`. |
 
-Email sign-in (magic links, SMTP) is **not built yet** (see issue #5). Sign-in is GitHub only for now.
+Email sign-in (magic links, SMTP) is **not built yet** (see issue #5). Sign-in is GitHub and Google.
 
 ## Backups
 

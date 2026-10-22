@@ -29,6 +29,10 @@ export const user = sqliteTable("user", {
     .default(false)
     .notNull(),
   image: text("image"),
+  // Set by the two-factor plugin once the first authenticator code is verified.
+  twoFactorEnabled: integer("two_factor_enabled", { mode: "boolean" })
+    .default(false)
+    .notNull(),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -74,6 +78,27 @@ export const account = sqliteTable(
     updatedAt: updatedAt(),
   },
   (table) => [index("account_user_id_idx").on(table.userId)],
+);
+
+/** One authenticator secret per user and its backup codes, both encrypted at rest by Better Auth with BETTER_AUTH_SECRET. */
+export const twoFactor = sqliteTable(
+  "two_factor",
+  {
+    id: text("id").primaryKey(),
+    secret: text("secret").notNull(),
+    backupCodes: text("backup_codes").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // False between "scan the QR" and "typed a valid code".
+    verified: integer("verified", { mode: "boolean" }).default(true).notNull(),
+    failedVerificationCount: integer("failed_verification_count").default(0).notNull(),
+    lockedUntil: integer("locked_until", { mode: "timestamp_ms" }),
+  },
+  (table) => [
+    index("two_factor_secret_idx").on(table.secret),
+    index("two_factor_user_id_idx").on(table.userId),
+  ],
 );
 
 export const verification = sqliteTable(

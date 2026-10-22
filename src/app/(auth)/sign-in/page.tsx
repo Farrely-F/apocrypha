@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { AuthStage } from "@/components/shell";
-import { testAuthEnabled } from "@/lib/auth/auth";
+import { providersEnabled, testAuthEnabled } from "@/lib/auth/auth";
 import { signInErrorMessage } from "@/lib/auth/errors";
 import { getSession } from "@/lib/auth/session";
 import { SignInScreen } from "./sign-in-screen";
@@ -15,7 +15,7 @@ async function Gate({ searchParams }: { searchParams: Promise<{ error?: string |
   const code = Array.isArray(error) ? error[0] : error;
   return (
     <SignInScreen
-      githubEnabled={Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET)}
+      providers={providersEnabled}
       testAuth={testAuthEnabled}
       error={signInErrorMessage(code)}
     />

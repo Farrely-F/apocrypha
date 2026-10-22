@@ -11,3 +11,7 @@ export function signedInRecently(session: { createdAt: Date | string | number },
 }
 
 export const REAUTH_MESSAGE = "For your safety, sign out and sign in again, then retry. Changing the passphrase needs a sign-in from the last 15 minutes.";
+
+export const REAUTH_2FA_MESSAGE = "For your safety, sign out and sign in again, then retry. This needs a sign-in from the last 15 minutes.";
+
+export const REAUTH_ERASE_MESSAGE = "For your safety, sign out and sign in again, then retry. Erasing an account needs a sign-in from the last 15 minutes.";
