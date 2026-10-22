@@ -47,3 +47,6 @@ export async function limited(db: Db, key: string | null, limit: number, windowM
   const r = await hit(db, key, limit, windowMs);
   return r.ok ? null : tooMany(r.retryAfterSeconds);
 }
+
+/** A signed-in client that writes in a loop (a script, a stuck retry) is slowed down; ordinary use is far below this. */
+export const limitWrites = (db: Db, userId: string) => limited(db, `write:${userId}`, 300, 60_000);

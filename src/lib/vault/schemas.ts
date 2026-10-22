@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { passphraseStrength } from "./strength";
 
 /** A new passphrase must be strong and typed twice. Not trimmed: spaces count. */

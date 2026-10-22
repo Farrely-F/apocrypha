@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { UserAvatar } from "@/components/brand/user-avatar";
 import { Pane } from "@/components/shell";
 import { Alert, AlertDescription } from "@/components/ui/alert";

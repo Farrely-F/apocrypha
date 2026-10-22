@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { MAX_SECRET_VALUE_BYTES } from "../crypto";
 
 /** Same shape as the variable names a .env file allows. */

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { MAX_VIEWS } from "./payload";
 
 /** Minutes; "0" means no time limit (then a view limit is required). */

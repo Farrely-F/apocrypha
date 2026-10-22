@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { AppLoading } from "@/components/shell";
 import { VaultFrame } from "@/components/vault";
@@ -26,7 +27,9 @@ async function SessionGate({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+// Everything behind sign-in is rendered per request so it can carry the per-request CSP nonce.
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  await connection();
   return (
     <Suspense fallback={<AppLoading />}>
       <SessionGate>{children}</SessionGate>

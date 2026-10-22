@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 
 /** Plaintext names: short, printable, no control characters. */
 const name = (what: string) =>

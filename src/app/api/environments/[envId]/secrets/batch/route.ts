@@ -4,6 +4,7 @@ import { audit } from "@/lib/audit/store";
 import { orgOfEnv } from "@/lib/audit/lookup";
 import { readJsonLimited } from "@/lib/http/body";
 import { sameOrigin } from "@/lib/http/origin";
+import { limitWrites } from "@/lib/http/ratelimit";
 import { parseBatch } from "@/lib/secrets/payload";
 import { createSecrets, getEnvironmentKeys } from "@/lib/secrets/store";
 import { isUuid } from "@/lib/workspace/shared";
@@ -19,6 +20,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ env
   if (!sameOrigin(request)) return json({ error: "Cross-origin request refused." }, 403);
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) return json({ error: "Sign in first." }, 401);
+  const slow = await limitWrites(db, session.user.id);
+  if (slow) return slow;
 
   const { envId } = await params;
   const access = isUuid(envId) ? await getEnvironmentKeys(db, session.user.id, envId) : null;

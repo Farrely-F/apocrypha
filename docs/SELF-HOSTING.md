@@ -27,6 +27,8 @@ The first start creates the database on the `apocrypha-data` volume and applies 
 
 Check that it is healthy: `curl http://localhost:3000/api/health` returns `{"ok":true}`, and `docker compose ps` shows `healthy`.
 
+Check that your proxy has not weakened the page: `npm run verify:security -- https://your-url` (from a checkout) asserts the Content Security Policy, that every script carries its per-request nonce, and the security headers. Your reverse proxy must pass `Content-Security-Policy` and the other security headers through unchanged, and must **overwrite** (not append to) `X-Forwarded-For` so rate limits see the real client address. See [`SECURITY.md`](SECURITY.md).
+
 ## Configuration
 
 Everything is an environment variable.

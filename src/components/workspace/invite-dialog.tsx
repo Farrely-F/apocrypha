@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, Copy, X } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
-import { z } from "zod";
+import { z } from "@/lib/zod";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";

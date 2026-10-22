@@ -3,6 +3,7 @@ import { audit } from "@/lib/audit/store";
 import { db } from "@/lib/db/client";
 import { readJsonLimited } from "@/lib/http/body";
 import { sameOrigin } from "@/lib/http/origin";
+import { limitWrites } from "@/lib/http/ratelimit";
 import { parseVaultPayload } from "@/lib/vault/payload";
 import { createVaultRecord } from "@/lib/vault/store";
 
@@ -14,6 +15,8 @@ export async function POST(request: Request) {
 
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) return json({ error: "Sign in first." }, 401);
+  const slow = await limitWrites(db, session.user.id);
+  if (slow) return slow;
 
   const read = await readJsonLimited(request, 64_000);
   if (!read.ok) return json({ error: read.error }, read.status);

@@ -3,6 +3,7 @@ import { db } from "@/lib/db/client";
 import { audit } from "@/lib/audit/store";
 import { readJsonLimited } from "@/lib/http/body";
 import { sameOrigin } from "@/lib/http/origin";
+import { limitWrites } from "@/lib/http/ratelimit";
 import { getVaultRecord } from "@/lib/vault/store";
 import { createProject } from "@/lib/workspace/manage";
 import { parseNewProject } from "@/lib/workspace/payload";
@@ -14,6 +15,8 @@ export async function POST(request: Request) {
   if (!sameOrigin(request)) return json({ error: "Cross-origin request refused." }, 403);
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) return json({ error: "Sign in first." }, 401);
+  const slow = await limitWrites(db, session.user.id);
+  if (slow) return slow;
   const vault = await getVaultRecord(db, session.user.id);
   if (!vault) return json({ error: "Create your vault first." }, 409);
 

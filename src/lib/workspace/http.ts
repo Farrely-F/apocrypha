@@ -1,6 +1,8 @@
 import { auth } from "@/lib/auth/auth";
 import { readJsonLimited } from "@/lib/http/body";
+import { db } from "@/lib/db/client";
 import { sameOrigin } from "@/lib/http/origin";
+import { limitWrites } from "@/lib/http/ratelimit";
 import { parseName } from "@/lib/vault/payload";
 import type { ManageResult } from "./manage";
 
@@ -10,7 +12,12 @@ export const json = (body: unknown, status = 200) => Response.json(body, { statu
 export async function guard(request: Request): Promise<{ userId: string } | Response> {
   if (!sameOrigin(request)) return json({ error: "Cross-origin request refused." }, 403);
   const session = await auth.api.getSession({ headers: request.headers });
-  return session ? { userId: session.user.id } : json({ error: "Sign in first." }, 401);
+  if (!session) return json({ error: "Sign in first." }, 401);
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    const slow = await limitWrites(db, session.user.id);
+    if (slow) return slow;
+  }
+  return { userId: session.user.id };
 }
 
 /** `{ name }` from a PATCH body, or an error response. */

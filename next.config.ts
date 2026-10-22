@@ -1,31 +1,18 @@
 import type { NextConfig } from "next";
 
-const dev = process.env.NODE_ENV !== "production";
+// The Content Security Policy is set per request in src/proxy.ts, because it carries a nonce
+// (see src/lib/security/csp.ts). These are the headers that do not change per request.
+const https = (process.env.BETTER_AUTH_URL ?? "").startsWith("https://");
 
-// Secrets are decrypted in this page's JS, so the page must not load or talk to
-// anything else. Next injects inline bootstrap scripts, hence 'unsafe-inline';
-// 'wasm-unsafe-eval' is for Argon2id (hash-wasm). Tighten with nonces later.
-const csp = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${dev ? " 'unsafe-eval'" : ""}`,
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://avatars.githubusercontent.com",
-  "font-src 'self' data:",
-  `connect-src 'self'${dev ? " ws: wss:" : ""}`,
-  "worker-src 'self' blob:",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-].join("; ");
-
-const securityHeaders = [
-  { key: "Content-Security-Policy", value: csp },
+export const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "no-referrer" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()" },
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  { key: "X-Permitted-Cross-Domain-Policies", value: "none" },
+  // Only when the server is configured for https: on plain http (localhost) the header does nothing.
+  ...(https ? [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" }] : []),
 ];
 
 const nextConfig: NextConfig = {
@@ -33,6 +20,10 @@ const nextConfig: NextConfig = {
   // A self-contained server (.next/standalone) so the Docker image does not need the whole node_modules.
   output: "standalone",
   headers: async () => [{ source: "/:path*", headers: securityHeaders }],
+  experimental: {
+    // Integrity hashes on the script and stylesheet files Next can hash at build time.
+    sri: { algorithm: "sha384" },
+  },
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

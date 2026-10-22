@@ -19,3 +19,6 @@ export default function SharePage({ params }: { params: Params }) {
     </Suspense>
   );
 }
+
+// Rendered per request so it can carry the CSP nonce.
+export const instant = false;

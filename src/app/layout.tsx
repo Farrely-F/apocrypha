@@ -3,6 +3,7 @@ import { Geist_Mono, Grenze_Gotisch } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { SITE } from "@/lib/seo";
+import { PolicyBoundary } from "@/components/security/policy-boundary";
 
 // Working face: everything is mono.
 const geistMono = Geist_Mono({
@@ -44,7 +45,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         display.variable,
       )}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <PolicyBoundary />
+        {children}
+      </body>
     </html>
   );
 }

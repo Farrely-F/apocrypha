@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 
 /** The dev-only email and password sign-in (APOCRYPHA_TEST_AUTH=1). */
 export const devSignInSchema = z.object({

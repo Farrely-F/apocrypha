@@ -2,7 +2,16 @@
 
 End-to-end encrypted environment-secret store for developers. Secrets are sealed in your browser before they leave it; the server only ever stores ciphertext. Named for Hermaeus Mora, keeper of forbidden knowledge.
 
-> **Status: pre-release, unaudited.** The cryptography in `src/lib/crypto` has not been reviewed by a third party. Do not store secrets you cannot afford to lose or leak. See [`docs/DESIGN.md`](docs/DESIGN.md) for the threat model and the 16 design decisions.
+> **Status: pre-release, unaudited.** The cryptography in `src/lib/crypto` has not been reviewed by a third party (only by an AI assistant: see [`docs/crypto-review.md`](docs/crypto-review.md)). Do not store secrets you cannot afford to lose or leak. See [`docs/DESIGN.md`](docs/DESIGN.md) for the threat model and the 16 design decisions.
+
+## What you are trusting
+
+- **Not independently audited.** The crypto is checked against published test vectors and has had a self-review by an AI assistant ([`docs/crypto-review.md`](docs/crypto-review.md)), which is not an outside audit and found limits worth reading, such as grants the server hands out that nothing signs yet. Do not store anything you cannot rotate.
+- **The server serves the code that decrypts.** A compromised server or build could ship a page that steals your passphrase. A strict, nonce-based Content Security Policy and open source shrink that risk; they do not remove it.
+- **Removing someone does not make them forget.** Rotate the secrets themselves at their source. The app lists which ones the person could read.
+- **Lose the passphrase and the recovery key and the data is gone.** Nobody can recover a vault, including the server's operator.
+
+Each of these is checked by a test or by `npm run verify:security`; [`docs/SECURITY.md`](docs/SECURITY.md) says which and how.
 
 ## How it works
 
@@ -31,7 +40,8 @@ For local testing without GitHub, set `APOCRYPHA_TEST_AUTH=1` (ignored in produc
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Dev server |
-| `npm test` | Unit tests (crypto, authorization, validation) |
+| `npm test` | Unit tests (crypto, authorization, validation, security headers and the claims on the landing page) |
+| `npm run verify:security -- <url>` | Check a running production server's CSP, nonces and headers. See [`docs/SECURITY.md`](docs/SECURITY.md) |
 | `npm run db:generate` | Generate a migration from `src/lib/db/schema.ts` |
 | `npm run db:migrate` | Apply migrations |
 | `npm run db:reset` | Delete the local SQLite file and re-migrate |

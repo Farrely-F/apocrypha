@@ -4,6 +4,7 @@ import * as React from "react"
 import { cn } from "cn"
 import { OTPInput, OTPInputContext } from "input-otp"
 import { MinusIcon } from "lucide-react"
+import { useCspNonce } from "@/lib/security/use-nonce"
 
 function InputOTP({
   className,
@@ -12,8 +13,14 @@ function InputOTP({
 }: React.ComponentProps<typeof OTPInput> & {
   containerClassName?: string
 }) {
+  // input-otp injects a <style> to hide password-manager badges, once, when it mounts; under our CSP that
+  // style needs the page's nonce, which is only known after hydration. Until then the field is a blank box
+  // of the same size, so nothing is injected without it.
+  const nonce = useCspNonce()
+  if (nonce === null) return <div aria-hidden className={cn("h-11 w-[16.5rem]", containerClassName)} />
   return (
     <OTPInput
+      nonce={nonce || undefined}
       data-slot="input-otp"
       containerClassName={cn(
         "cn-input-otp flex items-center has-disabled:opacity-50",
