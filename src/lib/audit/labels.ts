@@ -23,12 +23,16 @@ export function describeEvent(e: { type: string; actorName: string | null; envNa
       return "created a project";
     case "project.renamed":
       return "renamed a project";
+    case "project.updated":
+      return "edited the details of a project";
     case "project.deleted":
       return "deleted a project";
     case "env.created":
       return `created the environment${e.envName ? ` ${e.envName}` : ""}`;
     case "env.renamed":
       return `renamed the environment${e.envName ? ` to ${e.envName}` : ""}`;
+    case "env.updated":
+      return `changed the type of ${e.envName ?? "an environment"}`;
     case "env.deleted":
       return "deleted an environment";
     case "env.read":

@@ -2,6 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import type { LibSQLDatabase } from "drizzle-orm/libsql";
 import * as schema from "../db/schema";
 import type { WorkspacePayload } from "../vault/payload";
+import { inferKind, type EnvKind, type ProjectDetails, readTags } from "./meta";
 import { FIRST_KEY_VERSION, type WorkspaceIds } from "./shared";
 
 export { environmentPath, FIRST_KEY_VERSION, type WorkspaceIds } from "./shared";
@@ -41,6 +42,7 @@ export async function insertPersonalWorkspace(
     id: envId,
     projectId,
     name: ws.environmentName,
+    kind: ws.environmentKind ?? inferKind(ws.environmentName),
     currentKeyVersion: FIRST_KEY_VERSION,
   });
   await tx.insert(schema.environmentKeyGrant).values({
@@ -60,6 +62,8 @@ export type EnvironmentView = WorkspaceIds & {
   canWrite: boolean;
   projectName: string;
   environmentName: string;
+  environmentKind: EnvKind;
+  project: ProjectDetails;
   currentKeyVersion: number;
 };
 
@@ -79,6 +83,11 @@ export async function getEnvironmentForUser(
       role: schema.member.role,
       projectName: schema.project.name,
       environmentName: schema.environment.name,
+      environmentKind: schema.environment.kind,
+      description: schema.project.description,
+      tags: schema.project.tags,
+      repoUrl: schema.project.repoUrl,
+      docsUrl: schema.project.docsUrl,
       currentKeyVersion: schema.environment.currentKeyVersion,
     })
     .from(schema.environment)
@@ -110,7 +119,13 @@ export async function getEnvironmentForUser(
     .from(schema.environmentWrite)
     .where(and(eq(schema.environmentWrite.envId, ids.envId), eq(schema.environmentWrite.userId, userId)))
     .limit(1);
-  return { ...ids, ...row, canWrite: row.role === "owner" || row.role === "admin" || !!flag };
+  const { description, tags, repoUrl, docsUrl, ...rest } = row;
+  return {
+    ...ids,
+    ...rest,
+    project: { description, tags: readTags(tags), repoUrl, docsUrl },
+    canWrite: row.role === "owner" || row.role === "admin" || !!flag,
+  };
 }
 
 /**

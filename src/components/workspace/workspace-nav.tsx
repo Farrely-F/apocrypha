@@ -9,7 +9,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import { MembersDialog } from "@/components/workspace/members-dialog";
 import { AuditSheet } from "@/components/workspace/audit-sheet";
 import { InviteDialog } from "@/components/workspace/invite-dialog";
+import { KindBadge } from "@/components/workspace/details";
 import {
+  EditEnvironmentDialog,
+  EditProjectDialog,
   ManageDialog,
   NewEnvironmentDialog,
   NewOrganizationDialog,
@@ -50,7 +53,8 @@ export function WorkspaceNav({ tree }: { tree: TreeOrg[] }) {
   const canBuild = org ? org.role === "owner" || org.role === "admin" : false;
   const [newProject, setNewProject] = useState(false);
   const [newEnv, setNewEnv] = useState(false);
-  const [manage, setManage] = useState<{ kind: "project" | "environment"; mode: "rename" | "delete" } | null>(null);
+  const [manage, setManage] = useState<{ kind: "project" | "environment"; mode: "edit" | "delete" } | null>(null);
+  const orgTags = [...new Set(org?.projects.flatMap((p) => p.tags) ?? [])].sort();
 
   if (!org) return null;
 
@@ -136,8 +140,8 @@ export function WorkspaceNav({ tree }: { tree: TreeOrg[] }) {
               </DropdownMenuItem>
               {project && (
                 <>
-                  <DropdownMenuItem onClick={() => setManage({ kind: "project", mode: "rename" })}>
-                    <Pencil /> Rename project
+                  <DropdownMenuItem onClick={() => setManage({ kind: "project", mode: "edit" })}>
+                    <Pencil /> Edit project
                   </DropdownMenuItem>
                   <DropdownMenuItem variant="destructive" onClick={() => setManage({ kind: "project", mode: "delete" })}>
                     <Trash2 /> Delete project
@@ -164,6 +168,7 @@ export function WorkspaceNav({ tree }: { tree: TreeOrg[] }) {
               <DropdownMenuItem key={e.id} render={<Link href={environmentPath({ orgId: org.id, projectId: project.id, envId: e.id })} />}>
                 {e.id === env?.id ? <Check /> : <span className="size-4" />}
                 <span className="truncate">{e.name}</span>
+                <KindBadge kind={e.kind} className="ml-auto" />
               </DropdownMenuItem>
             ))}
           </DropdownMenuGroup>
@@ -179,8 +184,8 @@ export function WorkspaceNav({ tree }: { tree: TreeOrg[] }) {
               </DropdownMenuItem>
               {env && (
                 <>
-                  <DropdownMenuItem onClick={() => setManage({ kind: "environment", mode: "rename" })}>
-                    <Pencil /> Rename environment
+                  <DropdownMenuItem onClick={() => setManage({ kind: "environment", mode: "edit" })}>
+                    <Pencil /> Edit environment
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     variant="destructive"
@@ -208,15 +213,21 @@ export function WorkspaceNav({ tree }: { tree: TreeOrg[] }) {
         />
       )}
 
-      {manage && project && (
+      {manage?.mode === "edit" && manage.kind === "project" && project && (
+        <EditProjectDialog project={project} siblings={org.projects.map((p) => p.name)} suggestions={orgTags} onClose={() => setManage(null)} />
+      )}
+      {manage?.mode === "edit" && manage.kind === "environment" && project && env && (
+        <EditEnvironmentDialog environment={env} siblings={project.environments.map((e) => e.name)} onClose={() => setManage(null)} />
+      )}
+      {manage?.mode === "delete" && project && (
         <ManageDialog
-          key={`${manage.kind}-${manage.mode}`}
-          {...manage}
+          key={manage.kind}
+          kind={manage.kind}
           target={
             manage.kind === "project"
-              ? { id: project.id, name: project.name, url: `/api/projects/${project.id}`, siblings: org.projects.map((p) => p.name) }
+              ? { id: project.id, name: project.name, url: `/api/projects/${project.id}` }
               : env
-                ? { id: env.id, name: env.name, url: `/api/environments/${env.id}`, siblings: project.environments.map((e) => e.name) }
+                ? { id: env.id, name: env.name, url: `/api/environments/${env.id}` }
                 : null
           }
           onClose={() => setManage(null)}
@@ -227,6 +238,7 @@ export function WorkspaceNav({ tree }: { tree: TreeOrg[] }) {
         onOpenChange={setNewProject}
         orgId={org.id}
         taken={new Set(org.projects.map((p) => p.name.toLowerCase()))}
+        suggestions={orgTags}
       />
     </div>
   );

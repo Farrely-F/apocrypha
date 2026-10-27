@@ -178,6 +178,12 @@ export const project = sqliteTable(
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    // Plaintext details, visible to the server like the name (src/lib/workspace/meta.ts).
+    description: text("description"),
+    // JSON array of lowercase slugs.
+    tags: text("tags").notNull().default("[]"),
+    repoUrl: text("repo_url"),
+    docsUrl: text("docs_url"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -193,6 +199,8 @@ export const environment = sqliteTable(
       .notNull()
       .references(() => project.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    // dev | staging | prod | other: a badge so you can tell which one you are in (meta.ts ENV_KINDS).
+    kind: text("kind").$type<"dev" | "staging" | "prod" | "other">().notNull().default("other"),
     currentKeyVersion: integer("current_key_version").notNull().default(1),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

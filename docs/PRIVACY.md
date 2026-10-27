@@ -10,6 +10,7 @@ For people who **run** an Apocrypha server. This is an engineering description o
 | Linked sign-in methods and the provider's access/refresh tokens | `account` | Signing in with GitHub or Google | Yes |
 | Sessions: user agent, IP address, times | `session` | Keeping you signed in; the devices list | Yes |
 | Authenticator secret and backup codes (encrypted with `BETTER_AUTH_SECRET`) | `two_factor` | Two-step sign-in | Yes |
+| Project descriptions, tags and links, and environment types, as you type them | `project`, `environment` | Context for your team. Stored in plaintext like names, so keep secrets out | Yes (with the project, or your organisation) |
 | Vault public key, passphrase-wrapped private key, recovery-wrapped private key | `vault` | Opening your vault in a browser. We cannot read the wrapped keys | Yes |
 | Organisation memberships and roles | `member` | Access control | Yes |
 | Environment keys wrapped to you, write flags, re-share requests | `environment_key_grant`, `environment_write`, `regrant_request` | Access to environments | Yes |
