@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, Search, X } from "lucide-react";
+import { ChevronRight, Search, Tags, X } from "lucide-react";
 import { EmptyState } from "@/components/brand/empty-state";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EnvChip, TagChips } from "@/components/workspace/details";
@@ -15,6 +16,9 @@ import { projectPath } from "@/lib/workspace/shared";
 import { cn } from "@/lib/utils";
 
 /** Everything a person might type to find a project: its name, description, tags and environment names. */
+/** Tags shown as buttons before the rest go into a menu: enough to be quick, few enough to stay tidy. */
+const INLINE_TAGS = 5;
+
 const haystack = (p: TreeProject) =>
   [p.name, p.description ?? "", ...p.tags, ...p.environments.map((e) => e.name)].join(" ").toLowerCase();
 
@@ -25,7 +29,14 @@ const haystack = (p: TreeProject) =>
 export function ProjectList({ orgId, projects, canBuild }: { orgId: string; projects: TreeProject[]; canBuild: boolean }) {
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
-  const allTags = useMemo(() => [...new Set(projects.flatMap((p) => p.tags))].sort(), [projects]);
+  // Most used first, so the few buttons on show are the ones worth a click.
+  const counts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const p of projects) for (const t of p.tags) m.set(t, (m.get(t) ?? 0) + 1);
+    return m;
+  }, [projects]);
+  const allTags = useMemo(() => [...counts.keys()].sort((a, b) => counts.get(b)! - counts.get(a)! || a.localeCompare(b)), [counts]);
+  const suggestions = useMemo(() => [...allTags].sort(), [allTags]);
   const siblings = useMemo(() => projects.map((p) => p.name), [projects]);
 
   const needle = query.trim().toLowerCase();
@@ -58,7 +69,32 @@ export function ProjectList({ orgId, projects, canBuild }: { orgId: string; proj
               className="h-8 pl-8"
             />
           </div>
-          {allTags.length > 0 && <TagChips tags={allTags} active={picked} onSelect={toggle} />}
+          {allTags.length > 0 && (
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              <TagChips tags={allTags.slice(0, INLINE_TAGS)} active={picked} onSelect={toggle} />
+              {/* A picked tag stays visible even when it lives in the menu, so what is filtering is never hidden. */}
+              <TagChips tags={allTags.slice(INLINE_TAGS).filter((t) => picked.has(t))} active={picked} onSelect={toggle} />
+              {allTags.length > INLINE_TAGS && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs text-bone-dim" aria-label="More tags" />}>
+                    <Tags data-icon="inline-start" />
+                    {allTags.length - INLINE_TAGS} more
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="max-h-72 min-w-52 overflow-y-auto">
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel>Filter by tag</DropdownMenuLabel>
+                      {allTags.slice(INLINE_TAGS).map((t) => (
+                        <DropdownMenuCheckboxItem key={t} checked={picked.has(t)} onCheckedChange={() => toggle(t)}>
+                          {t}
+                          <span className="ml-auto pr-4 text-xs text-bone-faint">{counts.get(t)}</span>
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                    </DropdownMenuGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+          )}
           {filtering && (
             <Button type="button" variant="ghost" size="sm" onClick={clear} className="ml-auto text-bone-faint">
               <X data-icon="inline-start" />
@@ -98,10 +134,10 @@ export function ProjectList({ orgId, projects, canBuild }: { orgId: string; proj
                     {p.name}
                   </Link>
                   {p.description && <p className="mt-0.5 line-clamp-2 text-sm text-bone-dim">{p.description}</p>}
-                  <TagChips tags={p.tags} className="mt-1.5 md:hidden" />
+                  <TagChips tags={p.tags} max={3} className="mt-1.5 md:hidden" />
                 </TableCell>
                 <TableCell className="hidden max-w-[16rem] py-3 whitespace-normal md:table-cell">
-                  <TagChips tags={p.tags} active={picked} onSelect={toggle} />
+                  <TagChips tags={p.tags} max={3} active={picked} onSelect={toggle} />
                 </TableCell>
                 <TableCell className="py-3 whitespace-normal">
                   {p.environments.length === 0 ? (
@@ -116,7 +152,7 @@ export function ProjectList({ orgId, projects, canBuild }: { orgId: string; proj
                 </TableCell>
                 <TableCell className="pr-3">
                   <div className="flex items-center justify-end gap-1">
-                    <ProjectRowActions project={p} siblings={siblings} tags={allTags} canBuild={canBuild} redirect={`/o/${orgId}`} />
+                    <ProjectRowActions project={p} siblings={siblings} tags={suggestions} canBuild={canBuild} redirect={`/o/${orgId}`} />
                     <Link href={projectPath(orgId, p.id)} aria-label={`Open ${p.name}`} className={catalogue.chevron}>
                       <ChevronRight aria-hidden className="size-4" />
                     </Link>
