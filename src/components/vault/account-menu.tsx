@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, ChevronsUpDown, LogOut, Settings } from "lucide-react";
+import { Activity, BookOpen, ChevronsUpDown, LogOut, Settings } from "lucide-react";
 import { UserAvatar } from "@/components/brand/user-avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +38,9 @@ export function AccountMenu({ email, systemAdmin = false }: { email: string; sys
           <DropdownMenuSeparator />
           <DropdownMenuItem render={<Link href="/settings" />}>
             <Settings /> Settings
+          </DropdownMenuItem>
+          <DropdownMenuItem render={<a href="/docs" target="_blank" rel="noopener" />}>
+            <BookOpen /> Documentation
           </DropdownMenuItem>
           {systemAdmin && (
             <DropdownMenuItem render={<Link href="/admin" />}>

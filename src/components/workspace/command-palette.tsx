@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Boxes, CornerDownLeft, FolderTree, KeyRound, Lock, Route, Search, Settings, Terminal, Users } from "lucide-react";
+import { BookOpen, Boxes, CornerDownLeft, FolderTree, KeyRound, Lock, Route, Search, Settings, Terminal, Users } from "lucide-react";
 import { Command, CommandDialog, CommandEmpty, CommandFooter, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
 import { KindBadge } from "@/components/workspace/details";
@@ -126,6 +126,15 @@ export function CommandPalette({ tree }: { tree: TreeOrg[] }) {
                 }}
               >
                 <KeyRound /> Change passphrase
+              </CommandItem>
+              <CommandItem
+                value="documentation help guide docs"
+                onSelect={() => {
+                  setOpen(false);
+                  window.open("/docs", "_blank", "noopener");
+                }}
+              >
+                <BookOpen /> Documentation
               </CommandItem>
               <CommandItem
                 value="take the tour"

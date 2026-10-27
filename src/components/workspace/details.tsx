@@ -39,17 +39,22 @@ export function TagChips({
   tags,
   active,
   onSelect,
+  max,
   className,
 }: {
   tags: string[];
   active?: ReadonlySet<string>;
   onSelect?: (tag: string) => void;
+  /** Show at most this many, then "+N" (the rest are in its tooltip). Picked tags always show. */
+  max?: number;
   className?: string;
 }) {
   if (tags.length === 0) return null;
+  const shown = max === undefined || tags.length <= max ? tags : [...tags.slice(0, max), ...tags.slice(max).filter((t) => active?.has(t))];
+  const hidden = tags.filter((t) => !shown.includes(t));
   return (
     <span className={cn("flex flex-wrap items-center gap-1.5", className)}>
-      {tags.map((t) =>
+      {shown.map((t) =>
         onSelect ? (
           <button
             key={t}
@@ -65,6 +70,11 @@ export function TagChips({
             {t}
           </span>
         ),
+      )}
+      {hidden.length > 0 && (
+        <span title={hidden.join(", ")} className="px-1 text-[0.72rem] text-bone-faint">
+          +{hidden.length}
+        </span>
       )}
     </span>
   );

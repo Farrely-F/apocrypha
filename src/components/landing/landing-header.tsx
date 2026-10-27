@@ -132,6 +132,12 @@ export function LandingHeader({ repo }: { repo: string }) {
         </LayoutGroup>
 
         <div className="ml-auto flex shrink-0 items-center gap-1 md:ml-0">
+          <Link
+            href="/docs"
+            className="hidden rounded-full px-3 py-1.5 text-sm text-bone-dim transition-colors hover:text-bone sm:block"
+          >
+            Docs
+          </Link>
           <a
             href={repo}
             className={cn(

@@ -62,7 +62,7 @@ const design = [
   {
     term: "Sign in",
     pane: "Identity",
-    text: "GitHub, Google or an email link. That proves to the server who you are, and nothing more.",
+    text: "GitHub or Google. That proves to the server who you are, and nothing more.",
   },
   {
     term: "Make a vault",
@@ -120,7 +120,7 @@ const faq = [
   },
   {
     q: "How does a teammate get access?",
-    a: "Send them an invite link. The key they need travels after the # in the link, which browsers never send to us, and the invite works once, for 48 hours. You choose which environments they can read or write, and you can only share ones you can read yourself.",
+    a: "Send them an invite link. The key they need travels after the # in the link, which browsers never send to us, and the invite works once, for 48 hours. You choose which environments they can read, add write access afterwards, and you can only share ones you can read yourself.",
   },
   {
     q: "What happens when I remove someone?",
@@ -128,7 +128,7 @@ const faq = [
   },
   {
     q: "Can I run it myself?",
-    a: "Yes. It's a Next.js app and a Postgres database with a Docker setup, and the same encryption applies: the server you run still only holds ciphertext. The self-hosting guide in the repo covers configuration, backups and upgrades.",
+    a: "Yes. It's a Next.js app and a database file on a volume, with a Docker setup, and the same encryption applies: the server you run still only holds ciphertext. The self-hosting guide in the repo covers configuration, backups and upgrades.",
   },
   {
     q: "Is it safe for production secrets yet?",

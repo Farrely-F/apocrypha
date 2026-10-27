@@ -37,6 +37,7 @@ export function LandingFooter({ repo }: { repo: string }) {
         </div>
 
         <nav aria-label="Footer" className="flex flex-wrap gap-x-8 gap-y-3 text-sm">
+          <Link href="/docs" className={link}>Docs</Link>
           <Ext href={repo}>Source</Ext>
           <Ext href={`${repo}/blob/main/docs/crypto.md`}>Crypto spec</Ext>
           <Ext href={`${repo}/blob/main/docs/SELF-HOSTING.md`}>Self-hosting</Ext>
