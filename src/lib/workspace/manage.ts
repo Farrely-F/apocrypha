@@ -3,13 +3,14 @@ import type { LibSQLDatabase } from "drizzle-orm/libsql";
 import * as schema from "../db/schema";
 import type { OrgRole } from "../db/schema";
 import { insertPersonalWorkspace } from "./queries";
+import { inferKind, NO_DETAILS, readTags, type EnvKind, type ProjectDetails } from "./meta";
 import { FIRST_KEY_VERSION } from "./shared";
 import { BUILDERS } from "./roles";
 
 type Db = LibSQLDatabase<typeof schema>;
 
-export type TreeEnvironment = { id: string; name: string };
-export type TreeProject = { id: string; name: string; environments: TreeEnvironment[] };
+export type TreeEnvironment = { id: string; name: string; kind: EnvKind };
+export type TreeProject = ProjectDetails & { id: string; name: string; environments: TreeEnvironment[] };
 export type TreeOrg = { id: string; name: string; role: OrgRole; projects: TreeProject[] };
 
 /**
@@ -27,14 +28,27 @@ export async function listWorkspaceTree(db: Db, userId: string): Promise<TreeOrg
   if (orgs.length === 0) return [];
 
   const projects = await db
-    .select({ id: schema.project.id, orgId: schema.project.organizationId, name: schema.project.name })
+    .select({
+      id: schema.project.id,
+      orgId: schema.project.organizationId,
+      name: schema.project.name,
+      description: schema.project.description,
+      tags: schema.project.tags,
+      repoUrl: schema.project.repoUrl,
+      docsUrl: schema.project.docsUrl,
+    })
     .from(schema.project)
     .where(inArray(schema.project.organizationId, orgs.map((o) => o.id)))
     .orderBy(asc(schema.project.createdAt), asc(schema.project.id));
 
   const envs = projects.length
     ? await db
-        .select({ id: schema.environment.id, projectId: schema.environment.projectId, name: schema.environment.name })
+        .select({
+          id: schema.environment.id,
+          projectId: schema.environment.projectId,
+          name: schema.environment.name,
+          kind: schema.environment.kind,
+        })
         .from(schema.environment)
         .innerJoin(
           schema.environmentKeyGrant,
@@ -55,7 +69,11 @@ export async function listWorkspaceTree(db: Db, userId: string): Promise<TreeOrg
       .map((p) => ({
         id: p.id,
         name: p.name,
-        environments: envs.filter((e) => e.projectId === p.id).map((e) => ({ id: e.id, name: e.name })),
+        description: p.description,
+        tags: readTags(p.tags),
+        repoUrl: p.repoUrl,
+        docsUrl: p.docsUrl,
+        environments: envs.filter((e) => e.projectId === p.id).map((e) => ({ id: e.id, name: e.name, kind: e.kind })),
       }))
       // A project with no environment you can open is not something you can use.
       .filter((p) => p.environments.length > 0),
@@ -72,7 +90,7 @@ async function roleIn(db: Db, userId: string, orgId: string): Promise<OrgRole | 
   return row?.role ?? null;
 }
 
-export type NewEnvironment = { id: string; name: string; wrappedKey: string };
+export type NewEnvironment = { id: string; name: string; wrappedKey: string; kind?: EnvKind };
 
 export type CreateProjectResult =
   | { status: "created"; orgId: string; projectId: string; envId: string }
@@ -82,7 +100,7 @@ export type CreateProjectResult =
 export async function createProject(
   db: Db,
   userId: string,
-  input: { orgId: string; name: string; environment: NewEnvironment },
+  input: { orgId: string; name: string; environment: NewEnvironment; details?: Partial<ProjectDetails> },
 ): Promise<CreateProjectResult> {
   const role = await roleIn(db, userId, input.orgId);
   if (!role || !BUILDERS.includes(role)) return { status: "forbidden" };
@@ -98,7 +116,16 @@ export async function createProject(
 
   const projectId = crypto.randomUUID();
   await db.transaction(async (tx) => {
-    await tx.insert(schema.project).values({ id: projectId, organizationId: input.orgId, name: input.name });
+    const d = { ...NO_DETAILS, ...input.details };
+    await tx.insert(schema.project).values({
+      id: projectId,
+      organizationId: input.orgId,
+      name: input.name,
+      description: d.description,
+      tags: JSON.stringify(d.tags),
+      repoUrl: d.repoUrl,
+      docsUrl: d.docsUrl,
+    });
     await insertEnvironment(tx, userId, projectId, input.environment);
   });
   return { status: "created", orgId: input.orgId, projectId, envId: input.environment.id };
@@ -141,7 +168,13 @@ type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
 /** The environment and the creator's grant. The wrapped key is stored as received. */
 async function insertEnvironment(tx: Tx, userId: string, projectId: string, env: NewEnvironment) {
-  await tx.insert(schema.environment).values({ id: env.id, projectId, name: env.name, currentKeyVersion: FIRST_KEY_VERSION });
+  await tx.insert(schema.environment).values({
+    id: env.id,
+    projectId,
+    name: env.name,
+    kind: env.kind ?? inferKind(env.name),
+    currentKeyVersion: FIRST_KEY_VERSION,
+  });
   await tx.insert(schema.environmentKeyGrant).values({
     envId: env.id,
     principalType: "user",
@@ -173,19 +206,33 @@ async function roleOver(db: Db, userId: string, target: { projectId: string } | 
   return found && role ? { ...found, role } : null;
 }
 
-export async function renameProject(db: Db, userId: string, projectId: string, name: string): Promise<ManageResult> {
+export type ProjectPatch = Partial<ProjectDetails> & { name?: string };
+
+/** Change only the fields present: the name and any of the plaintext details. */
+export async function updateProject(db: Db, userId: string, projectId: string, patch: ProjectPatch): Promise<ManageResult> {
   const t = await roleOver(db, userId, { projectId });
   if (!t) return { status: "not-found" };
   if (!BUILDERS.includes(t.role)) return { status: "forbidden" };
-  const [dup] = await db
-    .select({ id: schema.project.id })
-    .from(schema.project)
-    .where(and(eq(schema.project.organizationId, t.orgId), eq(schema.project.name, name)))
-    .limit(1);
-  if (dup && dup.id !== projectId) return { status: "name-taken" };
-  await db.update(schema.project).set({ name }).where(eq(schema.project.id, projectId));
+  if (patch.name !== undefined) {
+    const [dup] = await db
+      .select({ id: schema.project.id })
+      .from(schema.project)
+      .where(and(eq(schema.project.organizationId, t.orgId), eq(schema.project.name, patch.name)))
+      .limit(1);
+    if (dup && dup.id !== projectId) return { status: "name-taken" };
+  }
+  const set: Partial<typeof schema.project.$inferInsert> = {};
+  if (patch.name !== undefined) set.name = patch.name;
+  if (patch.description !== undefined) set.description = patch.description;
+  if (patch.tags !== undefined) set.tags = JSON.stringify(patch.tags);
+  if (patch.repoUrl !== undefined) set.repoUrl = patch.repoUrl;
+  if (patch.docsUrl !== undefined) set.docsUrl = patch.docsUrl;
+  if (Object.keys(set).length > 0) await db.update(schema.project).set(set).where(eq(schema.project.id, projectId));
   return { status: "ok" };
 }
+
+export const renameProject = (db: Db, userId: string, projectId: string, name: string) =>
+  updateProject(db, userId, projectId, { name });
 
 /** Removes the project, its environments, keys and every secret version (cascade). */
 export async function deleteProject(db: Db, userId: string, projectId: string): Promise<ManageResult> {
@@ -196,19 +243,29 @@ export async function deleteProject(db: Db, userId: string, projectId: string): 
   return { status: "ok" };
 }
 
-export async function renameEnvironment(db: Db, userId: string, envId: string, name: string): Promise<ManageResult> {
+export type EnvironmentPatch = { name?: string; kind?: EnvKind };
+
+export async function updateEnvironment(db: Db, userId: string, envId: string, patch: EnvironmentPatch): Promise<ManageResult> {
   const t = await roleOver(db, userId, { envId });
   if (!t) return { status: "not-found" };
   if (!BUILDERS.includes(t.role)) return { status: "forbidden" };
-  const [dup] = await db
-    .select({ id: schema.environment.id })
-    .from(schema.environment)
-    .where(and(eq(schema.environment.projectId, t.projectId), eq(schema.environment.name, name)))
-    .limit(1);
-  if (dup && dup.id !== envId) return { status: "name-taken" };
-  await db.update(schema.environment).set({ name }).where(eq(schema.environment.id, envId));
+  if (patch.name !== undefined) {
+    const [dup] = await db
+      .select({ id: schema.environment.id })
+      .from(schema.environment)
+      .where(and(eq(schema.environment.projectId, t.projectId), eq(schema.environment.name, patch.name)))
+      .limit(1);
+    if (dup && dup.id !== envId) return { status: "name-taken" };
+  }
+  const set: Partial<typeof schema.environment.$inferInsert> = {};
+  if (patch.name !== undefined) set.name = patch.name;
+  if (patch.kind !== undefined) set.kind = patch.kind;
+  if (Object.keys(set).length > 0) await db.update(schema.environment).set(set).where(eq(schema.environment.id, envId));
   return { status: "ok" };
 }
+
+export const renameEnvironment = (db: Db, userId: string, envId: string, name: string) =>
+  updateEnvironment(db, userId, envId, { name });
 
 /** A project keeps at least one environment; to remove the last one, delete the project. */
 export async function deleteEnvironment(db: Db, userId: string, envId: string): Promise<ManageResult> {
@@ -239,6 +296,7 @@ export async function createOrganization(
         orgName: input.name,
         projectName: input.projectName,
         environmentName: input.environment.name,
+        environmentKind: input.environment.kind,
       },
       "org",
     ),

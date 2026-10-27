@@ -36,6 +36,8 @@ export type WorkspacePayload = {
   orgName: string;
   projectName: string;
   environmentName: string;
+  /** Set by new-organisation creation; otherwise guessed from the environment name. */
+  environmentKind?: "dev" | "staging" | "prod" | "other";
 };
 
 export type VaultPayload = {

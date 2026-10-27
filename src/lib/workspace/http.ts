@@ -4,7 +4,8 @@ import { db } from "@/lib/db/client";
 import { sameOrigin } from "@/lib/http/origin";
 import { limitWrites } from "@/lib/http/ratelimit";
 import { parseName } from "@/lib/vault/payload";
-import type { ManageResult } from "./manage";
+import { isEnvKind, parseProjectDetails, PROJECT_DETAIL_KEYS } from "./meta";
+import type { EnvironmentPatch, ManageResult, ProjectPatch } from "./manage";
 
 export const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { "cache-control": "private, no-store" } });
 
@@ -28,6 +29,48 @@ export async function readName(request: Request): Promise<{ name: string } | Res
   if (typeof o !== "object" || o === null || Object.keys(o).some((k) => k !== "name")) return json({ error: "Send only { name }." }, 400);
   const name = parseName(o.name, "name");
   return name.ok ? { name: name.value } : json({ error: name.error }, 400);
+}
+
+/** A PATCH body of only the keys in `allowed`, at least one. */
+async function readPatch(request: Request, allowed: readonly string[]): Promise<Record<string, unknown> | Response> {
+  const read = await readJsonLimited(request, 4_000);
+  if (!read.ok) return json({ error: read.error }, read.status);
+  const o = read.value as Record<string, unknown> | null;
+  if (typeof o !== "object" || o === null || Array.isArray(o)) return json({ error: "Send a JSON object." }, 400);
+  const keys = Object.keys(o);
+  if (keys.length === 0 || keys.some((k) => !allowed.includes(k))) return json({ error: `Send only ${allowed.join(", ")}.` }, 400);
+  return o;
+}
+
+/** The name and any plaintext details of a project, only those sent. */
+export async function readProjectPatch(request: Request): Promise<ProjectPatch | Response> {
+  const o = await readPatch(request, ["name", ...PROJECT_DETAIL_KEYS]);
+  if (o instanceof Response) return o;
+  const patch: ProjectPatch = {};
+  if ("name" in o) {
+    const name = parseName(o.name, "name");
+    if (!name.ok) return json({ error: name.error }, 400);
+    patch.name = name.value;
+  }
+  const details = parseProjectDetails(o);
+  if (!details.ok) return json({ error: details.error }, 400);
+  return { ...patch, ...details.value };
+}
+
+export async function readEnvironmentPatch(request: Request): Promise<EnvironmentPatch | Response> {
+  const o = await readPatch(request, ["name", "kind"]);
+  if (o instanceof Response) return o;
+  const patch: EnvironmentPatch = {};
+  if ("name" in o) {
+    const name = parseName(o.name, "name");
+    if (!name.ok) return json({ error: name.error }, 400);
+    patch.name = name.value;
+  }
+  if ("kind" in o) {
+    if (!isEnvKind(o.kind)) return json({ error: "kind must be dev, staging, prod or other." }, 400);
+    patch.kind = o.kind;
+  }
+  return patch;
 }
 
 export function manageResponse(r: ManageResult, noun: string): Response {

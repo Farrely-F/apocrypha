@@ -5,7 +5,8 @@ import { ChevronRight } from "lucide-react";
 import { EmptyState } from "@/components/brand/empty-state";
 import { Pane, PageSkeleton } from "@/components/shell";
 import { ListView, catalogue } from "@/components/workspace/list-view";
-import { EnvironmentRowActions, NewEnvironmentButton } from "@/components/workspace/workspace-dialogs";
+import { KindBadge, ProjectLinks, TagChips } from "@/components/workspace/details";
+import { EditProjectButton, EnvironmentRowActions, NewEnvironmentButton } from "@/components/workspace/workspace-dialogs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
@@ -25,17 +26,38 @@ async function Environments({ params }: { params: Params }) {
   if (!org || !project) notFound();
 
   const canBuild = org.role === "owner" || org.role === "admin";
+  const orgTags = [...new Set(org.projects.flatMap((p) => p.tags))].sort();
+  const bare = !project.description && project.tags.length === 0 && !project.repoUrl && !project.docsUrl;
 
   return (
     <ListView
       title={project.name}
+      details={
+        bare ? undefined : (
+          <>
+            {project.description && <p className="text-sm text-bone">{project.description}</p>}
+            <TagChips tags={project.tags} />
+            <ProjectLinks repoUrl={project.repoUrl} docsUrl={project.docsUrl} />
+          </>
+        )
+      }
       actions={
-        canBuild && project.environments.length > 0 ? (
-          <NewEnvironmentButton
-            projectId={project.id}
-            projectName={project.name}
-            taken={project.environments.map((e) => e.name)}
-          />
+        canBuild ? (
+          <>
+            <EditProjectButton
+              project={project}
+              siblings={org.projects.map((p) => p.name)}
+              tags={orgTags}
+              label={bare ? "Add details" : "Edit details"}
+            />
+            {project.environments.length > 0 && (
+              <NewEnvironmentButton
+                projectId={project.id}
+                projectName={project.name}
+                taken={project.environments.map((e) => e.name)}
+              />
+            )}
+          </>
         ) : undefined
       }
     >
@@ -63,6 +85,7 @@ async function Environments({ params }: { params: Params }) {
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead className={cn(catalogue.head, "pl-5")}>Environment</TableHead>
+                <TableHead className={catalogue.head}>Type</TableHead>
                 <TableHead className={cn(catalogue.head, "w-24 pr-3 text-right")}>
                   <span className="sr-only">Actions</span>
                 </TableHead>
@@ -79,10 +102,13 @@ async function Environments({ params }: { params: Params }) {
                       {e.name}
                     </Link>
                   </TableCell>
+                  <TableCell>
+                    <KindBadge kind={e.kind} />
+                  </TableCell>
                   <TableCell className="pr-3">
                     <div className="flex items-center justify-end gap-1">
                       <EnvironmentRowActions
-                        environment={{ id: e.id, name: e.name }}
+                        environment={{ id: e.id, name: e.name, kind: e.kind }}
                         siblings={project.environments.map((s) => s.name)}
                         canBuild={canBuild}
                         redirect={projectPath(org.id, project.id)}

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Boxes, CornerDownLeft, FolderTree, KeyRound, Lock, Route, Search, Settings, Terminal, Users } from "lucide-react";
 import { Command, CommandDialog, CommandEmpty, CommandFooter, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
+import { KindBadge } from "@/components/workspace/details";
 import { ChangePassphraseDialog } from "@/components/vault/change-passphrase-dialog";
 import { useTour } from "@/components/tour";
 import { useVault } from "@/components/vault/vault-provider";
@@ -75,11 +76,12 @@ export function CommandPalette({ tree }: { tree: TreeOrg[] }) {
                   p.environments.map((e) => (
                     <CommandItem
                       key={e.id}
-                      value={`${org.name} ${p.name} ${e.name}`}
+                      value={`${org.name} ${p.name} ${e.name} ${e.kind} ${p.tags.join(" ")}`}
                       onSelect={() => go(environmentPath({ orgId: org.id, projectId: p.id, envId: e.id }))}
                     >
                       <Terminal />
                       <span className="truncate">{e.name}</span>
+                      <KindBadge kind={e.kind} />
                       <span className="ml-auto truncate text-xs text-bone-faint">
                         {org.name} / {p.name}
                       </span>
@@ -100,7 +102,7 @@ export function CommandPalette({ tree }: { tree: TreeOrg[] }) {
                 </CommandItem>
               ))}
               {current?.projects.map((p) => (
-                <CommandItem key={p.id} value={`project ${current.name} ${p.name}`} onSelect={() => go(projectPath(current.id, p.id))}>
+                <CommandItem key={p.id} value={`project ${current.name} ${p.name} ${p.tags.join(" ")} ${p.description ?? ""}`} onSelect={() => go(projectPath(current.id, p.id))}>
                   <FolderTree /> {p.name}
                   <span className="ml-auto text-xs text-bone-faint">{p.environments.length} env</span>
                 </CommandItem>

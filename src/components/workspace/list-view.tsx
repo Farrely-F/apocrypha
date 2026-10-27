@@ -8,11 +8,14 @@ import type { ReactNode } from "react";
 export function ListView({
   title,
   summary,
+  details,
   actions,
   children,
 }: {
   title: string;
   summary?: ReactNode;
+  /** Block content under the summary: a description, tags, links. */
+  details?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
 }) {
@@ -24,6 +27,7 @@ export function ListView({
             {title}
           </h1>
           {summary && <p className="mt-3 max-w-[70ch] text-sm text-bone-dim">{summary}</p>}
+          {details && <div className="mt-3 grid max-w-[70ch] gap-2.5">{details}</div>}
         </div>
         {actions && <div className="flex shrink-0 flex-wrap items-center gap-2 pb-1">{actions}</div>}
       </header>
